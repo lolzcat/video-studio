@@ -64,7 +64,10 @@ No marker means face + voice only. Keep graphics ≤ 1 per line.
 python3 "$SKILL_DIR/scripts/voice_check.py" <script.md> --ref <reference transcript.txt>
 ```
 Fix every flag (or keep a line only if Andrew really says it that way), re-run until PASS.
-`--ref` also catches 4-word phrases lifted from the reference video.
+`--ref` also catches 4-word phrases lifted from the reference video. When the video rides a
+trend, its shared line is meant to be reused: pass it with `--allow "<trend phrase>"` (and
+record it as `trend_phrase:` in the script's front matter). Never attribute a trend line to a
+person (e.g. Hormozi) without the real clip.
 
 ## 6. Recording checklist
 Setup (layout, e.g. screen top / face bottom; mic; lighting) · say every hook **2–3 times**

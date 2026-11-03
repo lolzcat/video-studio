@@ -2,13 +2,16 @@
 """Flag lines in a script that sound written-by-AI instead of said-by-Andrew.
 
 Usage: voice_check.py <script.md | lines.txt> [--ref <reference transcript.txt> ...]
+                      [--allow "<trend phrase>" ...]
 
 Reads the "## Teleprompter" block of a script.md (or every non-empty line of a .txt).
 Per line it flags: hype/self-help vocabulary, em dashes/semicolons, "not X, it's Y"
 framing, slogan triplets, mic-drop fragments, mirrored sentences, missing contractions.
 Whole script: share of lines that start with a connector (So/And/Now/Alright…), and
 whether line lengths vary like real speech. With --ref, flags any 4-word phrase copied
-from a reference video's transcript (4-word phrases). See references/voice.md for the why.
+from a reference video's transcript (4-word phrases); --allow exempts a trend phrase the
+video is MEANT to reuse (the shared line of a trend, e.g. "change your life in six months").
+See references/voice.md for the why.
 Exit 1 if anything is flagged.
 """
 import re, statistics, sys
@@ -76,6 +79,9 @@ def main():
     args = sys.argv[1:]
     path = args[0]
     refs = [args[i + 1] for i, a in enumerate(args) if a == "--ref"]
+    allowed = set()
+    for a in (args[i + 1] for i, x in enumerate(args) if x == "--allow"):
+        allowed |= ngrams(a)
     lines = lines_of(path)
     ref_grams = set()
     for r in refs:
@@ -84,7 +90,7 @@ def main():
     print(f"Voice check {path} ({len(lines)} lines)")
     for i, line in enumerate(lines, 1):
         f = flags_for(line)
-        copied = sorted(g for g in ngrams(line) if g in ref_grams)
+        copied = sorted(g for g in ngrams(line) if g in ref_grams and g not in allowed)
         if copied:
             f.append(f'copied from reference: "{copied[0]}"')
         if f:
