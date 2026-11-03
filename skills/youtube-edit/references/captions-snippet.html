@@ -1,0 +1,55 @@
+<!--
+  Burned-in caption layer for a /youtube-edit HyperFrames composition (STYLE.md K1).
+  Data comes from scripts/captions.py → public/captions.js (window.__CAPS, window.__CAPS_Y).
+
+  Paste in three places in public/index.html:
+    1) the <style> rules into the composition's <style>
+    2) the host <div> inside #stage, AFTER the card hosts (captions sit on top)
+    3) the two <script> tags AFTER the main timeline script (it adds to that timeline)
+  Set DURATION to the composition's data-duration.
+-->
+
+<!-- 1) style -->
+<style>
+  .caps-host { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }
+  .caps-host .cap {
+    position: absolute; left: 70px; right: 70px; text-align: center;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 76px;
+    line-height: 1.08; letter-spacing: -0.01em; color: #ffffff;
+    -webkit-text-stroke: 12px #0b0b0f; paint-order: stroke fill;      /* outline that never eats the letters */
+    text-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+  }
+  .caps-host .cap .em { color: var(--accent-0); }
+</style>
+
+<!-- 2) host (inside #stage, after the card hosts) -->
+<div id="caps-host" class="caps-host clip" data-start="0" data-duration="DURATION" data-track-index="3"></div>
+
+<!-- 3) scripts (after the main timeline script) -->
+<script src="captions.js"></script>
+<script>
+  (function () {
+    const tl = window.__timelines && window.__timelines["talking-head-recut"];
+    const caps = window.__CAPS;
+    if (!tl || !caps) return;
+    const host = document.getElementById("caps-host");
+    const y = window.__CAPS_Y || Math.round(1920 * 0.68);
+    const q = (t) => Math.round(t * 30) / 30;
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    caps.forEach(function (c, i) {
+      const el = document.createElement("div");
+      el.className = "cap";
+      el.id = "cap-" + i;
+      el.style.top = y + "px";
+      el.innerHTML = c.words.map(function (w) {
+        return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t);
+      }).join(" ");
+      host.appendChild(el);
+      tl.set(el, { yPercent: -50, opacity: 0 }, 0);
+      tl.set(el, { opacity: 1 }, q(c.in));
+      tl.fromTo(el, { scale: 0.94 }, { scale: 1, duration: 0.1, ease: "power2.out" }, q(c.in));
+      tl.set(el, { opacity: 0 }, q(c.out));
+    });
+  })();
+</script>

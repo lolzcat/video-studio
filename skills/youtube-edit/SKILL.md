@@ -138,6 +138,19 @@ Lint, snapshot one dense frame, then render. Screenshot B-roll becomes cards (fu
 and optional highlight box). Render at the source resolution (4K if source is 4K).
 Output: `<workdir>/graphics.mp4`.
 
+**Captions (STYLE.md K1 — every short):** after `words_cut.json` is final (re-ASR of the cut),
+add a `"captions"` block to `overlays.json` — `y` (read it off a gridded frame: over cap/chin/
+chest, clear of cards and the platform UI), `fixes` (every ASR misspelling: product names,
+"revers"→"roofers"), `emphasis` (key words) — then:
+```bash
+python3 "$SKILL_DIR/scripts/captions.py" <workdir>
+```
+It writes `public/captions.js` (+ `captions.srt` to upload as platform subtitles). Paste
+[references/captions-snippet.html](references/captions-snippet.html) into the composition
+(style, host div after the cards, scripts after the main timeline). Read the printed groups:
+fix any misspelling in `fixes` and re-run. `check_plan.py` fails captions that collide with a
+card and warns when anything sits under the Reels/TikTok UI.
+
 If there are no graphics this pass, use `cut.mp4` as the picture.
 
 ### 7. Sound → `sound_plan.json`
@@ -167,7 +180,8 @@ in `"spoken"`), so graphics stay on the word *and* hit the music.
 ```bash
 python3 "$SKILL_DIR/scripts/check_plan.py" <workdir> --format hook|short|full
 ```
-Fix every FAIL (hook in 3s, card overlap/too short, text under 40px, text over the face)
+Fix every FAIL (hook in 3s, card overlap/too short, text under 40px, text over the face,
+captions colliding with a card)
 before step 6's render. WARNs (pacing gaps, SFX spacing, unbound SFX) are judgment calls.
 
 Mix:

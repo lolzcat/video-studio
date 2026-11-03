@@ -20,3 +20,4 @@ One line per note: `YYYY-MM-DD | video | raw note | → rule ID (added/changed/r
 2026-11-03 | roofer-leads v4 | reviewer r3 7.1/revise (final round): disputed blocker "If" clipped at 0:28 (my gap map: dip at 5.78 before "if"; reviewer ASR missed "If" 2/3) — needs Andrew's ear | → open
 2026-11-03 | roofer-leads v4 | reviewer r3: c5 pop left at -6 dB after re-time, 26.5 dB clear (harsh) | → sync_sheet HOT check; c5 back to -14 (v5)
 2026-11-03 | roofer-leads | reviewers disagreed on the ending (r1: end on "leads"; r3: keep "that we can sell to") | → taste call for Andrew
+2026-11-03 | six-months reference + roofer v6 | (Andrew: "Yes, add captions") — reference reel captions every line; pipeline had none | → K1 (candidate), captions.py + captions-snippet.html, check_plan K1 collision + Reels/TikTok UI-zone checks

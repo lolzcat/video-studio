@@ -6,7 +6,7 @@ Usage: check_plan.py <workdir> [--format hook|short|full]
 Reads <workdir>/overlays.json, sound_plan.json, and edl_tight.json (or edl.json).
 Exit 1 on any FAIL. Rule IDs refer to STYLE.md; thresholds are the STYLE.md values.
 """
-import json, os, sys
+import json, os, re, sys
 
 FMT = {  # max seconds without a visual change (STYLE.md G2)
     "hook": 4.0, "short": 4.0, "full": 8.0,
@@ -16,6 +16,8 @@ MIN_CARD = 1.2       # G1
 MIN_FONT_1080 = 40   # T1: smallest text at 1080px canvas width (~14pt on a phone)
 SFX_GAP = 2.0        # S3
 SFX_ALIGN = 0.10     # SFX should land within 100ms of a visual
+CAP_HALF_H = 90      # K1: caption band = centre y +- 90px (two lines at 76px)
+UI_TOP, UI_BOTTOM, UI_RIGHT = 220, 420, 140  # 9:16 Reels/TikTok UI: top bar, caption/handle area, button column
 
 
 def load(workdir, *names):
@@ -85,6 +87,39 @@ def main():
             o = overlap(face, c["bbox"])
             if o > 0.02 * c["bbox"][2] * c["bbox"][3]:
                 fails.append(f"G3 {c['id']} covers the face box ({o / (c['bbox'][2] * c['bbox'][3]):.0%} of the card)")
+
+    # K1 captions: present on shorts, never under a card, inside the platform-safe area
+    cap_path = os.path.join(workdir, "public", "captions.js")
+    W, H = ov.get("canvas", [1080, 1920])
+    vertical = H > W
+    if os.path.exists(cap_path):
+        txt = open(cap_path).read()
+        caps = json.loads(re.search(r"window\.__CAPS = (\[.*?\]);", txt, re.S).group(1))
+        ym = re.search(r"window\.__CAPS_Y = (\d+|null)", txt)
+        cy = int(ym.group(1)) if ym and ym.group(1) != "null" else int(H * 0.68)
+        band = [70, cy - CAP_HALF_H, W - 140, 2 * CAP_HALF_H]
+        for c in cards:
+            if not c.get("bbox"):
+                continue
+            hit = [k for k in caps if k["in"] < c["end"] and k["out"] > c["start"]]
+            if hit and overlap(band, c["bbox"]) > 0:
+                fails.append(f"K1 captions (y {cy}) collide with {c['id']} while both are on screen — "
+                             f"move captions.y or the card")
+        if vertical and (cy - CAP_HALF_H < UI_TOP or cy + CAP_HALF_H > H - UI_BOTTOM):
+            warns.append(f"K1 caption band y {cy - CAP_HALF_H}-{cy + CAP_HALF_H} is under the Reels/TikTok UI "
+                         f"(keep it inside {UI_TOP}-{H - UI_BOTTOM})")
+        if face and overlap(band, face) > 0.5 * band[2] * band[3]:
+            warns.append("K1 caption band sits mostly over the face box — check it covers chin/chest/cap, not eyes or mouth")
+    elif fmt in ("short", "hook"):
+        warns.append("K1 no captions (public/captions.js) — shorts caption every line; run captions.py")
+    if vertical:
+        for c in cards:
+            x, y, w, h = c.get("bbox", [0, 0, 0, 0])
+            if w >= W - 1:
+                continue  # full-width B-roll/images are meant to fill the frame
+            in_buttons = x + w > W - UI_RIGHT + 40 and y + h > 860 and y < H - UI_BOTTOM
+            if h and (y + h > H - UI_BOTTOM or y < UI_TOP or in_buttons):
+                warns.append(f"K1 {c['id']} reaches into the Reels/TikTok UI area — may be covered on phones")
 
     # S3 SFX spacing + alignment to visuals
     sfx = sorted(plan.get("sfx", []), key=lambda s: s["at"])

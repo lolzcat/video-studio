@@ -33,6 +33,9 @@ apply them, and confirm/adjust them with Andrew.
 - **T1** *(candidate)* Smallest text on any graphic ≥ 40px at 1080px wide (~14pt on a phone) — this includes kickers, labels and badges.
 - **A1** *(candidate)* Every on-screen claim, stat or product name is checked against its source (the screen recording or the real page) and never says more than Andrew said.
 
+## Captions
+- **K1** *(candidate, from the "Six months" reference)* Shorts get burned-in captions on every spoken line: 2–4 words per group (max 7 when merging), ≥ 0.5s on screen, never ending on a weak word ("the", "with"…); white Inter 700 76px with a dark outline, numbers and key words in the accent colour; ASR misspellings fixed (product names, numbers as "1,100"). Band sits over cap/chin/chest, never eyes or mouth; never collides with a card; inside the Reels/TikTok safe area (y 220–1500 on 1920, clear of the right-side buttons).
+
 ## Look
 - **L1** Palette: near-black `#0B0B0F` cards, white `#FFFFFF` text, one accent `#7C5CFF`. Accent only for the key word.
 - **L2** Fonts: bold geometric sans for titles (e.g. Inter Tight / Satoshi 800), regular for body. No more than 2 families.
