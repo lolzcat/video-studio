@@ -10,6 +10,9 @@ user-invocable: true
 Claude is the editor and project manager. Andrew records and gives notes; everything
 else runs through this pipeline. **Read [STYLE.md](STYLE.md) before every edit — it is
 the source of truth for taste and overrides any default below or in another skill.**
+If Andrew names a style profile ("use style short-form-v1"), also read
+`~/projects/video-studio/styles/<name>.md`: its rules override STYLE.md for that edit
+wherever they conflict (it's built from a creator study by `/video-research`).
 
 `SKILL_DIR` = the directory holding this file (`~/.claude/skills/youtube-edit`).
 

@@ -11,6 +11,12 @@ Claude Code skills for Andrew's video pipeline, from idea to finished edit.
 
 Each skill's `SKILL.md` has the full workflow. `youtube-edit/STYLE.md` holds the editing rules learned from feedback; `youtube-edit/references/feedback-log.md` records why each rule exists.
 
+## Style profiles
+
+`styles/*.md` are style profiles built from creator studies (`/video-research` creator
+study mode). Tell `/video-script` or `/youtube-edit` "use style <name>" to apply one on top
+of `youtube-edit/STYLE.md`. `short-form-v1` comes from 30 reels by three talking-head creators.
+
 ## Install
 
 ```bash

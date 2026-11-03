@@ -13,6 +13,8 @@ Read first, every time:
 - `~/.claude/skills/youtube-edit/STYLE.md` — H1 (3s hook), G1–G6, T1, A1: the script must
   set the edit up to pass them.
 - The reference pack, if given (`~/Obsidian/Luxvoni/Research/References/*.md`).
+- A style profile, if Andrew names one (`~/projects/video-studio/styles/<name>.md`): pick the
+  format first (it decides edit density), then follow its hook, proof and CTA rules.
 - [references/voice.md](references/voice.md) — how Andrew actually talks on camera (from
   his real takes) and the AI tells that make a script sound written instead of said.
 
