@@ -13,6 +13,10 @@ Read first, every time:
 - `~/.claude/skills/youtube-edit/STYLE.md` — H1 (3s hook), G1–G6, T1, A1: the script must
   set the edit up to pass them.
 - The reference pack, if given (`~/Obsidian/Luxvoni/Research/References/*.md`).
+- [references/voice.md](references/voice.md) — how Andrew actually talks on camera (from
+  his real takes) and the AI tells that make a script sound written instead of said.
+
+`SKILL_DIR` = this folder.
 
 Output: `script.md` from [references/script-template.md](references/script-template.md),
 saved to `~/Movies/youtube-edit/<yyyy-mm-dd>-<slug>/script.md` (the folder the edit will
@@ -44,14 +48,23 @@ Shorts: ≤ 6 beats, ~150 words/min of Andrew's natural pace. Note where the ref
 beats were, so the pacing is a deliberate choice.
 
 ## 5. The script + shot list
-Numbered lines `L1, L2 …`, one sentence each, written for the ear (contractions, short,
-his phrasing kept). Under each line, the markers `/youtube-edit` consumes:
+Numbered lines `L1, L2 …`, written the way **he** talks (voice.md): connectors ("So…",
+"Alright…", "And…"), "gonna", plain cause-and-effect, honest hedges, concrete numbers —
+some lines long and rambly, some short. No slogan triplets, mic-drop fragments, mirrored
+taglines, "not X, it's Y", em dashes, or hype words. Under each line, the markers `/youtube-edit` consumes:
 - `[GRAPHIC: <1–3 word pop or number card>]` — what text hits the screen (G4, T1)
 - `[B-ROLL: <real source URL or "my screen: …">]` — real sources only (G6)
 - `[SCREEN: <what to show in the screen recording while saying this>]`
 - `[ZOOM]` on emphasis lines · `[SFX: pop|whoosh|click]` sparingly (S3)
 - `[CLAIM: <stat/name to verify>]` — anything factual (A1)
 No marker means face + voice only. Keep graphics ≤ 1 per line.
+
+**Voice check (never skip):**
+```bash
+python3 "$SKILL_DIR/scripts/voice_check.py" <script.md> --ref <reference transcript.txt>
+```
+Fix every flag (or keep a line only if Andrew really says it that way), re-run until PASS.
+`--ref` also catches 4-word phrases lifted from the reference video.
 
 ## 6. Recording checklist
 Setup (layout, e.g. screen top / face bottom; mic; lighting) · say every hook **2–3 times**
@@ -65,6 +78,12 @@ videos — 4–6 short cut-down moments (line ranges + standalone hook each).
 
 ## 8. Flags
 Everything Andrew must confirm: numbers, names, claims, any `[DRAFT]` line.
+
+## Keep the voice guide growing
+After each recording, add 5–10 of Andrew's best natural lines from the edit's
+`cut_asr/transcript.txt` to **Real lines** in voice.md, and any new AI tell he calls out to
+the "does NOT sound like him" list. The more real lines it holds, the more scripts sound
+like him.
 
 ## Rules
 - Never write in the banned-filler voice (see content-engine plan). No guru-speak.
