@@ -59,6 +59,26 @@ Show Andrew the candidates as a table (views/day, outlier or save-rate, duration
 one line on why it's interesting) and let him pick 2–5. If he said "you pick", take the
 top scorers that share a format, plus one wildcard.
 
+## Creator discovery ("find good creators in my space")
+1. **Candidates from reel search.** Search engines index Instagram reels, so in the built-in
+   browser fetch `https://html.duckduckgo.com/html/?q=site:instagram.com/reel <niche query>`
+   for 10–12 niche phrasings (the `.result__a` title starts with the creator name; the
+   `.result__url` is the reel). TikTok search and topic pages need a login, so skip them. YouTube:
+   `find.py youtube` (ignore channels with tiny absolute views — set a floor like 50K).
+2. **Resolve handles + likes** without the browser:
+   `yt-dlp --skip-download --print "%(channel)s\t%(like_count)s\t%(comment_count)s" <reel url>`.
+   Rank by likes. Huge comments with low views means comment-bait; discard.
+3. **Verify every candidate's grid** (`https://www.instagram.com/<handle>/reels/`). The
+   pane renders lazily in the background, so take a tiny screenshot (scale 0.1), scroll,
+   take another, THEN read `a[href*="/reel/"]` innerText (views) and the `og:description`
+   follower count. Compute the recent median (skip the first 3, which are usually pinned),
+   **median ÷ followers**, **hit rate** (share of reels at or above ⅓ of followers) and the best reel.
+4. **Shortlist** by median ÷ followers and hit rate, compared within size bands (big accounts
+   coast). Pull one reel per pick (`pull.py --max-seconds 60`) to check language and format
+   before recommending. Hindi/Hinglish or clip pages are format references only.
+5. Save the shortlist to `~/Obsidian/Luxvoni/Research/References/<date>-creator-shortlist.md`,
+   then run creator study mode on the top 3.
+
 ## Creator study mode ("break down this creator")
 For studying one creator's whole style (or several, side by side):
 1. **List their videos with view counts.** YouTube/TikTok: `yt-dlp --flat-playlist` on the
