@@ -1,0 +1,22 @@
+# Feedback log
+
+One line per note: `YYYY-MM-DD | video | raw note | → rule ID (added/changed/removed)`
+
+2026-11-03 | roofer-leads v1→v2 | (tooling, not Andrew's note) plan check: kickers/badge 22–24px unreadable on phone | → T1 added (candidate), labels 40px in v2
+2026-11-03 | roofer-leads v1→v2 | (tooling) sync sheet: pop file has 95ms leading silence → pops sounded late; pop at 6.10s buried -10.5 dB under voice | → mix.py trims SFX lead-in; S4 amended; S6 added (candidate)
+2026-11-03 | roofer-leads v2 | (Andrew asked for beat snapping) | → B1 added (candidate); 3/12 visuals snapped (±80ms)
+2026-11-03 | skill | (Andrew approved: reviewer, rule checks, sync sheet) | → H1, A1 added (candidate); SKILL steps 5–8b updated
+2026-11-03 | roofer-leads v2 | reviewer r1 6.0/revise: neighbours shared zoom, all punches 1.08 | → cut.py alternate_zooms + "punch" 1.15 (Z1 enforced)
+2026-11-03 | roofer-leads v2 | reviewer r1: punch-in cropped the screen half | → cut.py "zoom_region" (face-only zoom on split recordings)
+2026-11-03 | roofer-leads v2 | reviewer r1: "BEST FOR PRICE"/"EVERY CITY" overstate what was said | → wording fixed; A1 applied
+2026-11-03 | roofer-leads v2 | reviewer r1: "And just like that" opener, filler "now"s, false outro, trailing ending | → SKILL step 3 editorial checklist + gaps.py + raw tail
+2026-11-03 | roofer-leads v2 | reviewer r1: names popped up to 350ms before spoken; loop restart slipped the beat | → words_cut from ASR on the cut; timing.py loops
+2026-11-03 | roofer-leads v3 | reviewer r2 6.6/revise BLOCKER: last word clipped ("lead-"), "conta-" — cut inside a consonant closure | → gaps.py flags <=60ms dips as closures; cut after the burst
+2026-11-03 | roofer-leads v3 | reviewer r2: 0.5s segments + zoom toggles read as jitter | → cut.py MIN_SAVE 150ms; C3 amended
+2026-11-03 | roofer-leads v3 | reviewer r2: reason ("$0 → free tool") came after the result | → reordered; editorial checklist
+2026-11-03 | roofer-leads v3 | reviewer r2: "IN ONE CITY" unsaid; "Lousy" stated as fact; kickers at T1 floor; rows see-through | → NEW YORK CITY (on screen), PROBABLY, kickers 44px #C8C8D0, opaque rows
+2026-11-03 | roofer-leads v3 | reviewer r2: no tension bed in hook (S1); loop restart under payoff | → tension-hook bed 0–7.2s → lo-fi single pass; timing.py "beats": false for ambient beds
+2026-11-03 | roofer-leads v4 | (QC) loudness landed -15.3 — limiter/TP cap ate gain | → mix.py iterative gain+limiter loop (-14.2 LUFS)
+2026-11-03 | roofer-leads v4 | reviewer r3 7.1/revise (final round): disputed blocker "If" clipped at 0:28 (my gap map: dip at 5.78 before "if"; reviewer ASR missed "If" 2/3) — needs Andrew's ear | → open
+2026-11-03 | roofer-leads v4 | reviewer r3: c5 pop left at -6 dB after re-time, 26.5 dB clear (harsh) | → sync_sheet HOT check; c5 back to -14 (v5)
+2026-11-03 | roofer-leads | reviewers disagreed on the ending (r1: end on "leads"; r3: keep "that we can sell to") | → taste call for Andrew

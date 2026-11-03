@@ -1,0 +1,56 @@
+# Andrew's editing style (living rules)
+
+Starter defaults (v0, 2026-11-03). Every rule here should come from Andrew's feedback
+over time — replace these as notes come in. Rule IDs are permanent; retired rules are
+deleted, not renumbered. Channel pillars: AI tools, cold outreach, ADHD, making money
+online. Tone: direct, energetic, tutorial-friendly — not hype-y.
+
+Rules marked *(candidate)* came from tooling or research, not from Andrew's notes yet —
+apply them, and confirm/adjust them with Andrew.
+
+## Hook
+- **H1** *(candidate)* Something hits the screen within the first 3s (graphic, zoom change or cut), and the first line gives a reason to keep watching.
+
+## Cutting
+- **C1** Keep the last clean take of any repeated line unless an earlier take is clearly better delivered.
+- **C2** Remove filler ("um", "uh", "like" used as filler, "so yeah"), false starts and restarts.
+- **C3** Max pause between sentences: 0.25s in hooks/shorts, 0.4s in full videos. Keep a longer pause only before a punchline. Don't add a jump cut that saves < 150ms — pauses up to ~0.4s in shorts are left alone (reviewer r2: micro-cuts read as jitter).
+- **C4** Never cut mid-word. Pad in 0.08s, out 0.12s.
+- **C5** Hook (first ~30s) is the tightest part of the video — every line must earn its place.
+
+## Zooms
+- **Z1** On jump cuts, alternate framing 1.0 ↔ 1.12–1.18 punch-in so cuts look intentional.
+- **Z2** Bigger punch-in (1.3) for emphasis lines and when Andrew says "zoom".
+- **Z3** Punch-in focus on the face (eyes in upper third), never crop the top of the head.
+
+## Graphics
+- **G1** At most one graphic on screen at a time; no graphic shorter than 1.2s.
+- **G2** Hooks: a visual change every 2–4s (cut, zoom, or graphic). Full videos: every 5–8s.
+- **G3** Graphics never cover the face — use the side opposite the face, or lower third.
+- **G4** Keyword pops: 1–3 words max, appear on the spoken word, exit cleanly.
+- **G5** Logos are shown large (≥ 25% of frame width) with a short pop-in.
+- **G6** B-roll must be real (real post, page, paper). Highlight the exact line being discussed.
+- **T1** *(candidate)* Smallest text on any graphic ≥ 40px at 1080px wide (~14pt on a phone) — this includes kickers, labels and badges.
+- **A1** *(candidate)* Every on-screen claim, stat or product name is checked against its source (the screen recording or the real page) and never says more than Andrew said.
+
+## Look
+- **L1** Palette: near-black `#0B0B0F` cards, white `#FFFFFF` text, one accent `#7C5CFF`. Accent only for the key word.
+- **L2** Fonts: bold geometric sans for titles (e.g. Inter Tight / Satoshi 800), regular for body. No more than 2 families.
+- **L3** Motion: fast in (≤ 250ms, ease-out), quick out (≤ 200ms). No bouncy/elastic easing unless asked.
+- **L4** Rounded corners 16–24px, soft shadow; no gradients-for-the-sake-of-it.
+
+## Sound
+- **S1** Hook: subtle suspense/tension bed. After the hook: low lo-fi hip-hop / chill beat.
+- **S2** Music sits well under voice: start around -24 dB with ducking on; voice always wins.
+- **S3** SFX are sparse: soft pop/whoosh on graphic entry, click on UI clicks. Never more than one SFX per 2s.
+- **S4** SFX gain around -12 to -16 dB; nothing harsh or cartoonish. If the sync sheet says an SFX is buried under the voice, raise it in 3 dB steps up to -6 dB, or drop it.
+- **S6** *(candidate)* Every SFX must be heard within 40ms of its visual, and never BURIED (sync sheet SNR < -6 dB in its band) — raise it per S4 or drop it. "Faint" (-6..0 dB) is allowed only once it's at the S4 ceiling; list those for Andrew's ear.
+- **B1** *(candidate)* Graphic entries snap to the music beat when a beat is within ±80ms of the spoken word; never move a graphic further than that off the word.
+- **S5** Final loudness -14 LUFS integrated, true peak ≤ -1 dBTP.
+
+## Animation library
+Reusable cards that have worked. Add an entry when Andrew likes one.
+Entries marked *(candidate)* were first used in v1 and are not yet approved by Andrew.
+- **Seam pill** *(candidate, 2026-11-03 roofer-leads)* — dark rounded pill on the screen/face seam, optional small uppercase kicker + 104px bold line with the key word in accent. In 0.24s power3.out from y+28 / scale 0.92; out 0.18s. Numbers count up (0.8–0.9s). SFX: soft pop at entry.
+- **Tool stack** *(candidate)* — 2–3 stacked rows naming tools, each popping in on its spoken word; recommended one gets accent outline + "Best for price"-style badge. SFX: pop on first and last row only.
+- **Real-site B-roll** *(candidate)* — screenshot of the real site covering the screen half, slow push-in to 1.06, pill caption with domain. SFX: soft whoosh.

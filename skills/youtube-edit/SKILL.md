@@ -1,0 +1,218 @@
+---
+name: youtube-edit
+description: Andrew's end-to-end YouTube editor. Takes raw talking-head / screen-recording footage and produces an edited video — picks best takes and cuts flubs from a Parakeet transcript, adds punch-in zooms, HyperFrames motion graphics, researched B-roll screenshots, music beds and SFX, then runs an ffmpeg QC pass. Learns Andrew's style from timestamped feedback and writes it back into STYLE.md. Trigger on "edit this video/hook/short", "use my YouTube edit skill", "cut this footage", "rough cut", "v2 with these notes", or "learn from this edit / save that to the skill".
+argument-hint: "<raw video path(s)> [notes]"
+user-invocable: true
+---
+
+# YouTube Edit
+
+Claude is the editor and project manager. Andrew records and gives notes; everything
+else runs through this pipeline. **Read [STYLE.md](STYLE.md) before every edit — it is
+the source of truth for taste and overrides any default below or in another skill.**
+
+`SKILL_DIR` = the directory holding this file (`~/.claude/skills/youtube-edit`).
+
+## Team → tool map
+
+| Job | Tool |
+|---|---|
+| Transcriber | `parakeet-mlx` (local, free) via `scripts/transcribe.py`; falls back to `mlx_whisper` |
+| Editor (takes, cuts, zooms) | Claude reads `transcript.txt` → writes `edl.json` → `scripts/cut.py` |
+| Animator | HyperFrames (`/hyperframes:talking-head-recut`, `/hyperframes:hyperframes-animation`) |
+| Researcher (B-roll) | Browser (built-in browser pane or Claude in Chrome) — screenshots of the real source |
+| Screen editor | Tella MCP if connected (`ToolSearch "tella"`); else treat screen recordings as normal input |
+| Sound designer | Epidemic Sound MCP if connected (`ToolSearch "epidemic"`); else `assets/music`, `assets/sfx`, or `/elevenlabs-music` |
+| Finisher | ffmpeg via `scripts/mix.py` + `scripts/qc.py` |
+
+## Workflow
+
+Work dir: `~/Movies/youtube-edit/<yyyy-mm-dd>-<slug>/`. Keep every intermediate file so
+a v2 only re-runs the steps the notes touch.
+
+### 0. Preflight (first run per machine, or if a command is missing)
+```bash
+command -v ffmpeg parakeet-mlx || uv tool install parakeet-mlx --python 3.12
+npx -y hyperframes doctor
+```
+Check optional connectors with `ToolSearch` (`tella`, `epidemic`). Missing ones are not
+blockers — say which fallback you're using.
+
+### 1. Intake
+- `ffprobe` each input (duration, resolution, fps). Note whether it's a **hook**, a
+  **short** (9:16) or a **full video** — pacing rules in STYLE.md differ.
+- Read any notes Andrew gave ("when I say zoom, zoom"; "show 3 animations"). Notes in
+  the request beat STYLE.md for this edit only.
+
+### 2. Transcribe
+```bash
+python3 "$SKILL_DIR/scripts/transcribe.py" <raw.mp4> <workdir>
+```
+Read `transcript.txt`. Lines show `[start-end]`, flagged gaps, and low-confidence spans.
+
+### 3. Paper edit → `edl.json`
+Decide the cut from the transcript (see STYLE.md → Cutting). For every idea Andrew
+repeated, keep the **last clean take** unless an earlier one is clearly better.
+Remove: false starts, restarts, "um/uh", "let me try that again", reading-notes pauses,
+dead air. Cut on word boundaries from `words.json`; pad in by ~0.08s, out by ~0.12s.
+Assign zooms per STYLE.md (alternate 1.0 / punch-in on jump cuts so cuts feel intentional).
+Write `edl.json` with a `note` on each segment saying why it's kept.
+
+- **Several takes/files** (common — OBS/phone records one file per take): transcribe each
+  into `<workdir>/takes/tN/`, read them all, and give each segment `"src"` + `"words"`
+  pointing at that take. Re-takes across files follow C1 (latest clean take wins).
+- Set top-level `"max_pause"` (STYLE.md C3 value) so `cut.py` trims hesitations *inside*
+  kept lines automatically and flips the zoom at each internal jump. ASR timings drift
+  over pauses, so don't hand-trim gaps — let this do it.
+- Spell product names from what's **on screen** (grab a frame at that moment), not from
+  the ASR guess — e.g. ASR "reun" was Reoon.
+- **ASR word times drift 50–150 ms**, which leaves fragments ("now", "so", the tail of
+  "video") at cuts. Check every cut that splits a sentence with
+  `uv run "$SKILL_DIR/scripts/gaps.py" <take> <t-0.5> <t+0.5>` and cut inside a real dip.
+- Editorial passes the reviewer will otherwise catch: cold-open on the first line that
+  makes sense without setup (drop "And just like that…"); drop filler "now/so/so yeah" at
+  line starts; no false outros ("So that's it", "In this video" in a short); end on the
+  payoff word, then a short `"raw": true` silent tail (~0.5s) so the ending lands.
+- Split recordings (screen top / face bottom): set `"zoom_region"` to the face rect so
+  punch-ins don't crop the screen; `"punch": 1.15` (Z1). `cut.py` forces neighbouring
+  segments to alternate 1.0 ↔ punch.
+
+Before rendering, show Andrew a compact paper-edit table (segment, time, kept text, zoom)
+only if he asked to review it; otherwise proceed.
+
+### 4. Rough cut
+```bash
+python3 "$SKILL_DIR/scripts/cut.py" <raw.mp4> <workdir>/edl.json <workdir>/cut.mp4
+```
+Then **re-transcribe the cut** and use that as the timing truth:
+```bash
+python3 "$SKILL_DIR/scripts/transcribe.py" <workdir>/cut.mp4 <workdir>/cut_asr
+cp <workdir>/cut_asr/words.json <workdir>/words_cut.json
+```
+Read `cut_asr/transcript.txt` as the viewer will hear it — any leftover fragment means a
+cut point is wrong (fix with `gaps.py`, re-cut). **All later timing — overlays, SFX,
+music — uses `words_cut.json`, never source times.** (cut.py's own remap is approximate.)
+Spot-check: extract 3–4 frames around cuts with ffmpeg and look at them.
+
+### 5. Graphics + B-roll plan → `overlays.json`
+From `words_cut.json`, pick each moment that earns a visual (STYLE.md → Graphics) and
+write `<workdir>/overlays.json` — the **single source of truth for graphic timing**
+(format in `scripts/timing.py`'s docstring): per card `id`, `start`/`end` (on the spoken
+word), `text`, `bbox` [x,y,w,h], `font_px` (the **smallest** text on the card), optional
+`events` for inner beats (list rows, badges); plus `canvas` and `face_box` (the region
+graphics must never cover — read it off a frame). Respect the density in STYLE.md.
+
+**B-roll research:** when Andrew references a real thing ("OpenAI just announced…",
+"this post on X", a paper, a tool), open the real source in the browser, screenshot it
+(full-page or element), and save to `<workdir>/broll/`. Only show real, verifiable
+sources — never fabricate a post, headline or stat. If a source can't be found, skip the
+B-roll and list it in the delivery notes. Grab official logos from the company's own site
+or press kit.
+
+### 6. Animate (HyperFrames)
+HyperFrames is installed as a plugin, so run its CLI through the plugin launcher, not
+`npx hyperframes`:
+`node ~/.claude/plugins/cache/hyperframes/hyperframes/<ver>/skills/hyperframes/scripts/plugin-cli.mjs <lint|snapshot|render> public`.
+Load `/hyperframes:talking-head-recut` and follow it with `cut.mp4` as the input clip,
+**skipping its transcription step** (use `words_cut.json` — same `{text,start,end}` shape)
+and **using STYLE.md for palette, fonts, motion and card types** instead of asking style
+questions. Use the `overlay` layout (video full-bleed, transparent cards) — Andrew's
+footage is already composed. For split recordings (screen top / face bottom) put cards on
+the seam (~y 790 of 1920). **Never hard-code times in the composition:** load `timings.js` before the main
+script (`<script src="timings.js"></script>`) and read `window.__T.<card>.start|end|<event>`.
+Then a re-snap or a timing note is a re-export + re-render, not an HTML edit
+(`timing.py export` also rewrites each card-host's `data-start`/`data-duration`).
+After any re-cut, re-stage `public/input-video.mp4` from the new `cut.mp4` before
+rendering. Keep old versions in `<workdir>/versions/`, **never inside `public/`** (a
+second root composition there is a lint error and can double the audio).
+Lint, snapshot one dense frame, then render. Screenshot B-roll becomes cards (full-frame or side-panel, with slow push-in
+and optional highlight box). Render at the source resolution (4K if source is 4K).
+Output: `<workdir>/graphics.mp4`.
+
+If there are no graphics this pass, use `cut.mp4` as the picture.
+
+### 7. Sound → `sound_plan.json`
+Pick music + SFX per STYLE.md → Sound. Source order: Epidemic Sound MCP (download the
+track/SFX into `<workdir>/audio/`) → `assets/music`, `assets/sfx` → ElevenLabs.
+ElevenLabs: key is `ELEVENLABS_API_KEY` in `~/projects/claudeclaw-os/.env` (read it into a
+shell var, never print it); `POST https://api.elevenlabs.io/v1/sound-generation` with
+`{"text", "duration_seconds" (≤30), "prompt_influence"}`. Beds max 30s — for longer
+videos add another entry with the same file and run `uv run "$SKILL_DIR/scripts/timing.py" loops <sound_plan.json>`:
+it restarts the bed a whole number of bars in and crossfades, so the beat never slips. Save
+reusable SFX into `assets/sfx/` with a descriptive name.
+Place SFX on the frame the visual lands, not on the word: give each SFX `"on": "<card>"`
+or `"<card>.<event>"` (plus an optional `"offset"`, e.g. -0.05 for a whoosh that leads)
+and `timing.py export` sets its time. `mix.py` trims each SFX's leading silence, so `at`
+is when the transient sounds.
+
+**Snap graphics to the beat (STYLE.md B1)** — after music is chosen, before rendering:
+```bash
+uv run "$SKILL_DIR/scripts/timing.py" beats  <workdir>/sound_plan.json <workdir>/beats.json
+uv run "$SKILL_DIR/scripts/timing.py" snap   <workdir>/overlays.json <workdir>/beats.json --max-shift 0.08
+uv run "$SKILL_DIR/scripts/timing.py" export <workdir>/overlays.json <workdir>/public/timings.js <workdir>/sound_plan.json
+```
+Only shifts a card/event when a beat is within ±80 ms of the spoken word (originals kept
+in `"spoken"`), so graphics stay on the word *and* hit the music.
+
+**Check the plan before rendering** (cheap; rendering is not):
+```bash
+python3 "$SKILL_DIR/scripts/check_plan.py" <workdir> --format hook|short|full
+```
+Fix every FAIL (hook in 3s, card overlap/too short, text under 40px, text over the face)
+before step 6's render. WARNs (pacing gaps, SFX spacing, unbound SFX) are judgment calls.
+
+Mix:
+```bash
+python3 "$SKILL_DIR/scripts/mix.py" <workdir>/graphics.mp4 <workdir>/cut.mp4 \
+  <workdir>/sound_plan.json <workdir>/final_v1.mp4
+```
+
+### 8. QC (never skip)
+```bash
+python3 "$SKILL_DIR/scripts/qc.py" <workdir>/final_vN.mp4 --expect-duration <cut seconds>
+uv run "$SKILL_DIR/scripts/sync_sheet.py" <workdir> <workdir>/final_vN.mp4
+```
+`qc.py`: flashing (>3/s fails), black/frozen frames, dead air, loudness, A/V sync.
+`sync_sheet.py` is your ears: Read `sync_sheet.png` and the table. Every SFX must be
+`audible` (raise a BURIED/faint one 3 dB at a time up to -6 dB, or drop it) and heard
+within 40 ms of its visual. Fix every FAIL, then sample frames at each card and cut.
+
+### 8b. Independent review (never skip)
+Fill in [references/reviewer-brief.md](references/reviewer-brief.md) and send it to a
+**fresh** `Agent` (`general-purpose`) — only the brief and file paths, never your own
+notes or opinion of the edit. It returns JSON scores + timestamped issues.
+- `revise` → fix blockers and high-severity issues, re-render as the next version, re-run
+  step 8, review again with a new fresh agent. **Max 3 review rounds.**
+- `pass`, or 3 rounds done → deliver, listing any issues still open.
+Disagree with a reviewer issue only with a reason you'd tell Andrew; list it in delivery.
+
+### 9. Deliver
+Report: output path, raw → final duration, number of cuts, graphics, SFX, music track
+names + licence source, reviewer verdict/score per round, any B-roll that couldn't be sourced, and anything you were
+unsure about. Open the file for Andrew (`open <path>`) if he's at the machine.
+Version files `final_v1.mp4`, `final_v2.mp4`… never overwrite a delivered version.
+
+## Revisions (v2, v3…)
+Andrew's notes are usually timestamped ("at 0:22 the logo should be bigger"). Map each
+note to the step that owns it, re-run only from that step forward, and bump the version.
+Timestamps in notes refer to the **delivered video's** timeline.
+
+## Learning loop — the important part
+When Andrew says "learn from this", "save that to the skill", "remember that", or gives
+the same note twice:
+1. Turn each note into a **general, testable rule** ("Logos on screen ≥ 30% frame
+   width", not "make the OpenAI logo bigger in the Dev Day video").
+2. Add or edit it in the right section of [STYLE.md](STYLE.md) with the next rule number.
+   If it contradicts an existing rule, replace that rule — don't keep both.
+3. Append a dated line to [references/feedback-log.md](references/feedback-log.md):
+   the raw note, the video, and the rule ID it produced.
+4. If a new animation/card worked well, describe it in STYLE.md → Animation library so
+   it can be reused by name.
+5. Tell Andrew which rules changed (IDs + one line each).
+
+Never weaken a rule silently. Ask if a note is ambiguous about whether it's a one-off
+or a standing preference.
+
+## Cost notes
+Parakeet, HyperFrames, ffmpeg: free/local. Claude usage is the main cost; keep long
+footage efficient by working from `transcript.txt` and sampled frames, not full video.
