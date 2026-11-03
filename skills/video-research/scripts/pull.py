@@ -227,8 +227,8 @@ def main():
         vid = re.sub(r"[^A-Za-z0-9_-]+", "_", (re.search(r"(BV\w+|[\w-]{11})(?:\?|$|/)", src) or [None, f"v{n}"])[1])[:40]
         d = os.path.join(out, f"{n:02d}-{vid}")
         os.makedirs(d, exist_ok=True)
-        if n > 1 and "bilibili" in src:
-            time.sleep(BILI_PAUSE_S)  # back-to-back pulls trip Bilibili risk control (HTTP 567)
+        if n > 1 and ("bilibili" in src or "instagram" in src):
+            time.sleep(BILI_PAUSE_S)  # back-to-back pulls trip Bilibili (HTTP 567) / Instagram rate limits
         try:
             index.append(process(n, src, d, max_s, cookies, lang))
         except Exception as e:  # noqa: BLE001 — report this video and keep going with the rest

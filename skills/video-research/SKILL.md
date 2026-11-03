@@ -59,6 +59,29 @@ Show Andrew the candidates as a table (views/day, outlier or save-rate, duration
 one line on why it's interesting) and let him pick 2–5. If he said "you pick", take the
 top scorers that share a format, plus one wildcard.
 
+## Creator study mode ("break down this creator")
+For studying one creator's whole style (or several, side by side):
+1. **List their videos with view counts.** YouTube/TikTok: `yt-dlp --flat-playlist` on the
+   channel. Instagram blocks profile listing for yt-dlp, so open
+   `https://www.instagram.com/<handle>/reels/` in the built-in browser, close the sign-up
+   popup (never log in), and read the reel links + play counts from the grid
+   (`a[href*="/reel/"]` → href + innerText). The first 3 are often pinned older hits.
+2. **Pick 8–12 per creator**: their biggest hits AND their flops (the contrast is the
+   point), plus any video Andrew sent. Save the counts to `<dir>/views.json`.
+3. **Pull** each creator into its own folder (`pull.py … --out <dir>/<handle>`). Instagram and
+   Bilibili pulls are paced automatically.
+4. **One agent per creator, in parallel**, each given
+   [references/creator-study-brief.md](references/creator-study-brief.md) filled in. Each runs
+   `scripts/shots.py` on every video (real shot list, labelled per-shot frames, a hook strip
+   every 0.25s, word-level pace and pauses, a music read, SFX candidates) and writes
+   `<dir>/<handle>/study.md`: a breakdown of every video, then a channel synthesis (signature
+   moves, hits vs misses, format families, hook formulas, production fingerprint, evolution).
+5. **You write the cross-creator synthesis** and a **style profile**
+   (`~/projects/video-studio/styles/<name>.md`, same rule format as youtube-edit/STYLE.md),
+   which `/video-script` and `/youtube-edit` can be told to apply. Save the synthesis to
+   `~/Obsidian/Luxvoni/Research/References/`.
+Mimic **style and structure**, never identity: no catchphrases, branding, faces or footage.
+
 ## 3. Pull
 ```bash
 python3 "$SKILL_DIR/scripts/pull.py" <url|file> [...] --out <dir>/pack --max-seconds 900
