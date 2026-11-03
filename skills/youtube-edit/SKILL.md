@@ -43,6 +43,9 @@ blockers — say which fallback you're using.
   **short** (9:16) or a **full video** — pacing rules in STYLE.md differ.
 - Read any notes Andrew gave ("when I say zoom, zoom"; "show 3 animations"). Notes in
   the request beat STYLE.md for this edit only.
+- **If `<workdir>/script.md` exists** (from `/video-script`), read it: it is the intended
+  line order, the hook to use, and the shot list. Pipeline upstream:
+  `/video-research` (reference pack) → `/video-script` (script.md) → record → this skill.
 
 ### 2. Transcribe
 ```bash
@@ -51,7 +54,10 @@ python3 "$SKILL_DIR/scripts/transcribe.py" <raw.mp4> <workdir>
 Read `transcript.txt`. Lines show `[start-end]`, flagged gaps, and low-confidence spans.
 
 ### 3. Paper edit → `edl.json`
-Decide the cut from the transcript (see STYLE.md → Cutting). For every idea Andrew
+Decide the cut from the transcript (see STYLE.md → Cutting). With a `script.md`, map
+each take to its script line (`L1`, `L2`…) and put the line id in each segment's `note`:
+pick the best take per line, keep script order unless a take improves on it, and drop
+lines Andrew skipped — never invent a line he didn't record. For every idea Andrew
 repeated, keep the **last clean take** unless an earlier one is clearly better.
 Remove: false starts, restarts, "um/uh", "let me try that again", reading-notes pauses,
 dead air. Cut on word boundaries from `words.json`; pad in by ~0.08s, out by ~0.12s.
@@ -95,7 +101,10 @@ music — uses `words_cut.json`, never source times.** (cut.py's own remap is ap
 Spot-check: extract 3–4 frames around cuts with ffmpeg and look at them.
 
 ### 5. Graphics + B-roll plan → `overlays.json`
-From `words_cut.json`, pick each moment that earns a visual (STYLE.md → Graphics) and
+With a `script.md`, start from its markers: each `[GRAPHIC]` becomes a card on that
+line's key word, `[B-ROLL]`/`[SCREEN]` become B-roll cards, `[ZOOM]` a forced punch-in on
+that segment, `[SFX]` an `on:`-bound SFX, `[CLAIM]` a fact-check before it goes on screen.
+Then from `words_cut.json`, pick any other moment that earns a visual (STYLE.md → Graphics) and
 write `<workdir>/overlays.json` — the **single source of truth for graphic timing**
 (format in `scripts/timing.py`'s docstring): per card `id`, `start`/`end` (on the spoken
 word), `text`, `bbox` [x,y,w,h], `font_px` (the **smallest** text on the card), optional

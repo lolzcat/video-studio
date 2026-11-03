@@ -27,8 +27,8 @@ def parakeet(wav, workdir):
         for tok in sent["tokens"]:
             t = tok["text"]
             # Parakeet emits sub-word tokens; a leading space starts a new word.
-            # Digits glued to a word ("got226") are a separate word.
-            if words and t[:1].isdigit() and words[-1]["text"][-1:].isalpha():
+            # Digits/currency glued to a word ("got226", "has$500") are a separate word.
+            if words and (t[:1].isdigit() or t[:1] in "$€£¥") and words[-1]["text"][-1:].isalpha():
                 t = " " + t
             if words and not t.startswith(" ") and not t.strip() == "":
                 w = words[-1]
