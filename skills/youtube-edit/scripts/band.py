@@ -21,17 +21,25 @@ overlays.json additions (alongside the usual canvas/face_box/cards/captions):
   "cards": [
     {"id": "c1", "start": 0.1, "end": 2.4, "text": "Never lose *money*"},          # kind "line" (default)
     {"id": "s1", "kind": "stat", "start": 9.0, "end": 11.4, "text": "3–5×", "sub": "In 4–6 years"},
-    {"id": "n1", "kind": "tag", "start": 0.3, "end": 3.0, "text": "Aaron Darr", "sub": "Lead Edge Capital"}
+    {"id": "n1", "kind": "tag", "start": 20.0, "end": 21.6, "text": "Aaron Darr", "sub": "Lead Edge Capital"},
+                                        # tag = name line in the band slot (one band line at a time)
+    {"id": "s2", "kind": "stat", "kicker": "The goal", "text": "3–5×", "sub": "in *4–6 years*", ...}
   ],                                    # *word* = accent colour; "font_px" overrides 104 for a line
   "broll": [{"file": "/abs/diesel.mp4", "start": 2.6, "end": 4.3, "src_in": 0.0}]
-                                        # covers the speaker region (y 420–1920) with 0.12s fades
+                                        # covers the speaker region (y 420–1920), 1-frame fades
 Missing bboxes are filled in so check_plan.py can check them.
 """
 import html, json, os, re, shutil, subprocess, sys
 
 REGION = [0, 420, 1080, 1500]   # speaker region under the band
 LINE_BOX = [60, 300, 960, 116]
-TAG_BOX = [60, 448, 620, 112]
+
+
+def fps_of(path):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
+                        "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip() or "30/1"
+    n, d = r.split("/")
+    return round(float(n) / float(d or 1))
 
 
 def dur_of(path):
@@ -73,7 +81,7 @@ def picture(workdir, ov):
         chain.append(
             f"[{i}:v]trim={s_in}:{s_in + d + 0.05},setpts=PTS-STARTPTS+{b['start']}/TB,"
             f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,format=yuva420p,"
-            f"fade=t=in:st={b['start']}:d=0.12:alpha=1,fade=t=out:st={b['end'] - 0.12}:d=0.12:alpha=1[b{i}]")
+            f"fade=t=in:st={b['start']}:d=0.04:alpha=1,fade=t=out:st={b['end'] - 0.04}:d=0.04:alpha=1[b{i}]")
         chain.append(f"{last}[b{i}]overlay={x}:{y}:eof_action=pass:enable='between(t,{b['start']},{b['end']})'[v{i}]")
         last = f"[v{i}]"
     args += ["-filter_complex", ";".join(chain), "-map", last, "-map", "0:a", "-c:v", "libx264", "-crf", "16",
@@ -88,6 +96,7 @@ def main():
     ov = json.load(open(ovp))
     br = ov["brand"]
     dur = round(dur_of(os.path.join(workdir, "cut.mp4")), 3)
+    fps = fps_of(os.path.join(workdir, "cut.mp4"))  # render at the source rate: 24 -> 30 judders
     os.makedirs(pub, exist_ok=True)
 
     hf, cf = br["head_font"], br["cap_font"]
@@ -99,7 +108,7 @@ def main():
     kick = br.get("kicker", {})
     if kick.get("image"):
         kimg = stage(kick["image"], pub, "brand")
-        kicker_html = f'<img src="{kimg}" style="width:{int(kick.get("width", 430))}px" alt="">'
+        kicker_html = (f'<img src="{kimg}" style="width:{int(kick.get("width", 430))}px;mix-blend-mode:lighten" alt="">')
     else:
         kicker_html = html.escape(kick.get("text", ""))
 
@@ -113,8 +122,8 @@ def main():
             c.setdefault("bbox", REGION)
             c.setdefault("font_px", 64)
         elif kind == "tag":
-            c.setdefault("bbox", TAG_BOX)
-            c.setdefault("font_px", 40)
+            c["bbox"] = LINE_BOX
+            c.setdefault("font_px", 84)
     json.dump(ov, open(ovp, "w"), indent=1, ensure_ascii=False)
 
     hosts = []
@@ -129,17 +138,19 @@ def main():
             fs = f' style="font-size:{int(c["font_px"])}px"' if c.get("font_px", 104) != 104 else ""
             inner = f'<div class="slot"><div class="line" id="{cid}-line"{fs}>{rich(c["text"])}</div></div>'
         elif kind == "stat":
-            inner = (f'<div class="stat" id="{cid}-stat"><div class="big" id="{cid}-big">{rich(c["text"])}</div>'
+            kk = f'<div class="kick">{rich(c["kicker"])}</div>' if c.get("kicker") else ""
+            inner = (f'<div class="stat" id="{cid}-stat">{kk}<div class="big" id="{cid}-big">{rich(c["text"])}</div>'
                      f'<div class="sub" id="{cid}-sub">{rich(c.get("sub", ""))}</div></div>')
-        else:
-            inner = (f'<div class="tag" id="{cid}-tag"><div class="name">{rich(c["text"])}</div>'
-                     f'<div class="org">{rich(c.get("sub", ""))}</div></div>')
+        else:  # name tag: lives in the band slot like a headline
+            fs = int(c.get("font_px", 84))
+            inner = (f'<div class="slot"><div class="line" id="{cid}-line" style="font-size:{fs}px">'
+                     f'{rich(c["text"])}<span class="accent"> · {html.escape(c.get("sub", ""))}</span></div></div>')
         hosts.append(f'      <div {attrs}>\n        <div class="card" data-card-id="{cid}" data-kind="{kind}">{inner}</div>\n      </div>')
 
     kinds = {c["id"]: c.get("kind", "line") for c in ov["cards"] if not c.get("persistent")}
     caps_y = int(ov.get("captions", {}).get("y", 1410))
     page = TEMPLATE.format(
-        dur=dur, band=br["band"], text=br["text"], accent=br["accent"],
+        dur=dur, fps=fps, band=br["band"], text=br["text"], accent=br["accent"],
         hfam=hf["family"], hfile=hfile, hw=hf.get("weight", 400),
         cfam=cf["family"], cfile=cfile, cw=cf.get("weight", 700),
         kicker=kicker_html, hosts="\n".join(hosts), kinds=json.dumps(kinds), caps_y=caps_y,
@@ -174,11 +185,12 @@ TEMPLATE = """<!doctype html>
                     white-space: pre; font-family: "{hfam}", sans-serif; font-weight: {hw}; font-size: 104px;
                     line-height: 122px; letter-spacing: 0.03em; color: var(--text); text-transform: uppercase; }}
       .card .accent {{ color: var(--accent-0); }}
-      .card .stat {{ position: absolute; left: 0; top: 420px; width: 1080px; height: 1500px; background: rgba(10,10,10,0.94);
+      .card .stat {{ position: absolute; left: 0; top: 420px; width: 1080px; height: 1500px; background: var(--band);
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
                     padding-bottom: 420px; }}  /* keep the stat above the low captions (K2) */
       .card .stat .big {{ font-family: "{hfam}", sans-serif; font-size: 420px; line-height: 0.9; color: var(--accent-0); letter-spacing: 0.01em; }}
       .card .stat .sub {{ font-family: "{hfam}", sans-serif; font-size: 96px; letter-spacing: 0.08em; color: var(--text); text-transform: uppercase; }}
+      .card .stat .kick {{ font-family: "{hfam}", sans-serif; font-size: 72px; letter-spacing: 0.16em; color: var(--text); opacity: 0.8; }}
       .card .stat .sub .accent {{ color: var(--accent-0); }}
       .card .tag {{ position: absolute; left: 60px; top: 448px; padding: 16px 30px 18px; background: rgba(10,10,10,0.88);
                    border-left: 6px solid var(--accent-0); border-radius: 6px; }}
@@ -187,13 +199,13 @@ TEMPLATE = """<!doctype html>
       .caps-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
       .caps-host .cap {{ position: absolute; left: 70px; right: 70px; text-align: center; white-space: nowrap;
                         font-family: "{cfam}", sans-serif; font-weight: {cw}; font-size: 76px; line-height: 1.08;
-                        letter-spacing: -0.01em; color: #ffffff; -webkit-text-stroke: 12px #0a0a0a; paint-order: stroke fill;
+                        letter-spacing: 0; word-spacing: 0.14em; color: #ffffff; -webkit-text-stroke: 12px #0a0a0a; paint-order: stroke fill;
                         text-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; }}
       .caps-host .cap .em {{ color: var(--accent-0); }}
     </style>
   </head>
   <body>
-    <div id="stage" data-composition-id="talking-head-recut" data-start="0" data-duration="{dur}" data-fps="30" data-width="1080" data-height="1920">
+    <div id="stage" data-composition-id="talking-head-recut" data-start="0" data-duration="{dur}" data-fps="{fps}" data-width="1080" data-height="1920">
       <div class="video-wrapper"><video id="bg-video" src="input-video.mp4" playsinline data-has-audio="true" data-start="0" data-duration="{dur}" data-track-index="1"></video></div>
       <div class="head-host clip" data-start="0" data-duration="{dur}" data-track-index="2">
         <div class="kicker" id="kicker">{kicker}</div>
@@ -205,7 +217,7 @@ TEMPLATE = """<!doctype html>
       <script src="timings.js"></script>
       <script>
         (function () {{
-          const q = (t) => Math.round(t * 30) / 30;
+          const q = (t) => Math.round(t * {fps}) / {fps};
           const tl = window.gsap.timeline({{ paused: true }});
           const T = window.__T, KINDS = {kinds};
           const host = (id) => '.card-host[data-card-id="' + id + '"]';
@@ -216,7 +228,7 @@ TEMPLATE = """<!doctype html>
             const s = T[id].start, e = T[id].end, k = KINDS[id];
             tl.set(host(id), {{ visibility: "visible", opacity: 1 }}, q(s));
             tl.set(host(id), {{ opacity: 0, visibility: "hidden" }}, q(e));
-            if (k === "line") {{   // rises out of the accent rule, sinks out (STYLE L3)
+            if (k === "line" || k === "tag") {{   // rises out of the accent rule, sinks out (STYLE L3)
               tl.fromTo(el(id, "line"), {{ yPercent: 100, opacity: 0 }}, {{ yPercent: 0, opacity: 1, duration: 0.24, ease: "power3.out" }}, q(s));
               tl.to(el(id, "line"), {{ yPercent: -60, opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
             }} else if (k === "stat") {{
@@ -242,7 +254,7 @@ TEMPLATE = """<!doctype html>
           if (!tl || !caps) return;
           const host = document.getElementById("caps-host");
           const y = window.__CAPS_Y || {caps_y};
-          const q = (t) => Math.round(t * 30) / 30;
+          const q = (t) => Math.round(t * {fps}) / {fps};
           const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
           caps.forEach(function (c, i) {{
             const d = document.createElement("div");

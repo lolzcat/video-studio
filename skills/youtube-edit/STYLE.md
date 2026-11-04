@@ -29,7 +29,7 @@ apply them, and confirm/adjust them with Andrew.
 - **G3** Graphics never cover the face — use the side opposite the face, or lower third.
 - **G4** Keyword pops: 1–3 words max, appear on the spoken word, exit cleanly.
 - **G5** Logos are shown large (≥ 25% of frame width) with a short pop-in.
-- **G6** B-roll must be real (real post, page, paper). Highlight the exact line being discussed.
+- **G6** B-roll must be real (real post, page, paper). Highlight the exact line being discussed. Exception (Andrew, 2026-11-04: "generate it via oxen.ai if needed"): AI-generated B-roll may *illustrate a metaphor or idea*, never stand in for a real event, product or evidence, and never show a claim as fact that the speaker hedged (a fireball on "I think it explodes" is out; an engine that won't run is fine).
 - **T1** *(candidate)* Smallest text on any graphic ≥ 40px at 1080px wide (~14pt on a phone) — this includes kickers, labels and badges.
 - **A1** *(candidate)* Every on-screen claim, stat or product name is checked against its source (the screen recording or the real page) and never says more than Andrew said.
 

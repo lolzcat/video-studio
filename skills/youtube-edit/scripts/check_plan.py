@@ -4,8 +4,7 @@
 Usage: check_plan.py <workdir> [--format hook|short|full]
 
 Reads <workdir>/overlays.json, sound_plan.json, and edl_tight.json (or edl.json).
-Cards with "persistent": true (scoreboard, series title) and lower-third name tags (kind "tag")
-are exempt from one-at-a-time but must not be covered by another card or by captions.
+Cards with "persistent": true (scoreboard, series title) are exempt from one-at-a-time but must not be covered by another card or by captions.
 Cutaways (kind "stat", or "cutaway": true) replace the picture like B-roll: they may cover the
 face box, and captions are meant to sit on top of them.
 Exit 1 on any FAIL. Rule IDs refer to STYLE.md; thresholds are the STYLE.md values.
@@ -75,7 +74,7 @@ def main():
         if c["end"] - c["start"] < MIN_CARD:
             fails.append(f"G1 {c['id']} on screen {c['end'] - c['start']:.2f}s (< {MIN_CARD}s)")
     # Persistent labels (scoreboard, series title) sit on screen the whole video by design.
-    layered = lambda c: c.get("persistent") or c.get("kind") == "tag"
+    layered = lambda c: c.get("persistent")  # name tags live in the band slot: one at a time like lines
     transient = [c for c in cards if not layered(c)]
     persistent = [c for c in cards if layered(c)]
     for p in persistent:
@@ -140,7 +139,8 @@ def main():
     for a, b in zip(sfx, sfx[1:]):
         if b["at"] - a["at"] < SFX_GAP:
             warns.append(f"S3 SFX {b['at'] - a['at']:.2f}s apart at {a['at']:.2f}/{b['at']:.2f}s (min {SFX_GAP}s)")
-    visual_ts = [c["start"] for c in cards] + [v for c in cards for v in c.get("events", {}).values()]
+    visual_ts = [c["start"] for c in cards] + [v for c in cards for v in c.get("events", {}).values()] + \
+        [b["start"] for b in ov.get("broll", [])]  # band.py B-roll
     for s in sfx:
         d = min((abs(s["at"] - v) for v in visual_ts), default=99)
         if d > SFX_ALIGN and "on" not in s:

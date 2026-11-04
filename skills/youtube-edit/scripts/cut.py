@@ -71,6 +71,10 @@ def tighten(segs, max_pause):
     out = []
     for s in segs:
         if s.get("raw"):  # deliberate silence (held tail, beat before a punchline)
+            prev = out[-1] if out else None
+            if prev and prev["src"] == s["src"] and 0 < s["in"] - prev["out"] < 0.3:
+                # trimming moved the previous out earlier: start the tail there, or a 1-frame jump shows
+                s = {**s, "in": prev["out"]}
             out.append(s)
             continue
         a, b = s["in"], s["out"]

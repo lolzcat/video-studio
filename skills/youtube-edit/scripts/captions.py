@@ -84,7 +84,7 @@ def main():
         cur.append(w)
         nxt = words[i + 1] if i + 1 < len(words) else None
         pause = (nxt["start"] - w["end"]) if nxt else 99
-        end_sent = w["text"][-1:] in ".?!"
+        end_sent = tidy(w["text"], fixes)[-1:] in ".?!"   # a fix can add the full stop
         comma_pause = w["text"].endswith(",") and pause >= 0.25
         long = len(cur) >= max_w or (w["end"] - cur[0]["start"]) >= max_s \
             or (nxt is not None and not fits(cur + [nxt]))
