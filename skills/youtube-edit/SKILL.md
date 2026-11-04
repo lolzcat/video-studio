@@ -295,6 +295,12 @@ Aaron Darr). Workdir `~/Movies/youtube-edit/<date>-<show>-<guest>/`, one sub-fol
    (`-ss <a> -to <b>`, a few seconds of margin), then `transcribe.py` on it so times are local.
    With `"speed"`, use `max_pause` ≈ 0.45. Leave `smooth_motion` off: measured on the 9FE call
    footage it added background wobble (1.3% → 4% of frames) while removing repeated frames.
+   **Shaky webcam:** a cropped, enlarged call shot magnifies the guest's camera jitter. Measure it
+   on a rigid background edge (window/door frame), not with feature tracking (plain walls give
+   noise): `prof.py`-style profile correlation. If it jitters, edge-lock the speaker's half before
+   building `source_916.mp4`: `uv run "$SK/scripts/stabilize.py" half.mp4 half_lock.mp4 --lock-x
+   x0,x1,y0,y1` (a strip around one vertical edge; `--lock-y` for a horizontal one). 9FE Aaron:
+   side-to-side jitter 0.40 → 0.05px/frame median, peaks 3.3 → 1.6px.
 5. **Paper edit per clip:** open on the strongest line (H1) and keep their words and meaning —
    reorder only when the meaning holds, drop hedges never (A1). ASR invents "um/but/and" at
    joins: confirm every join on the cut with Whisper
