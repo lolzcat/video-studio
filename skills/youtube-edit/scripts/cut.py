@@ -24,6 +24,8 @@ Top level (all optional):
   max_pause    shorten every pause inside kept segments to this many seconds and
                trim edge silence; writes edl_tight.json
   punch        punch-in used when alternating framing on jump cuts (default 1.15, Z1)
+  level_voice  true: gain-match every piece's speech level to the median (±6 dB), so lines
+               joined from louder/quieter parts of a long recording don't step in volume
   zoom_region  [x, y, w, h] — punch in only inside this rect (e.g. the face half of a
                screen-top / face-bottom recording) and leave the rest of the frame at 1.0
 Every cut between two segments with the same zoom is a jump in place, so neighbours
@@ -63,6 +65,24 @@ def silences(src, cache={}):
         en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", log)]
         cache[src] = list(zip(st, en))
     return cache[src]
+
+
+def rms_db(src, a, b):
+    log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ss", str(a), "-to", str(b), "-i", src, "-vn",
+                          "-af", "astats=measure_perchannel=none", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    m = re.findall(r"RMS level dB: (-?[\d.]+)", log)
+    return float(m[-1]) if m else None
+
+
+def level_gains(segs):
+    """dB per piece that brings each spoken piece to the median level (raw tails stay at 0)."""
+    lv = [None if s.get("raw") or s["out"] - s["in"] < 0.4 else rms_db(s["src"], s["in"], s["out"]) for s in segs]
+    vals = sorted(v for v in lv if v is not None)
+    if not vals:
+        return [0.0] * len(segs)
+    med = vals[len(vals) // 2]
+    return [0.0 if v is None else max(-6.0, min(6.0, med - v)) for v in lv]
 
 
 def tighten(segs, max_pause):
@@ -132,6 +152,9 @@ def main():
     w, h, fps = probe(sources[0])
     rx, ry, rw, rh = edl.get("zoom_region", [0, 0, w, h])
     parts, labels = [], []
+    gains = level_gains(segs) if edl.get("level_voice") else [0.0] * len(segs)
+    if any(abs(g) >= 1 for g in gains):
+        print("voice levelling (dB): " + " ".join(f"{g:+.1f}" for g in gains))
     for i, s in enumerate(segs):
         k = sources.index(s["src"])
         a, b, z = s["in"], s["out"], float(s.get("zoom", 1.0))
@@ -147,7 +170,7 @@ def main():
         parts.append(v + f",fps={fps},format=yuv420p[v{i}]")
         d = b - a
         parts.append(f"[{k}:a]atrim={a}:{b},asetpts=PTS-STARTPTS,aresample=48000,"
-                     f"afade=t=in:d={FADE},afade=t=out:st={max(0, d - FADE)}:d={FADE}[a{i}]")
+                     f"volume={gains[i]:.2f}dB,afade=t=in:d={FADE},afade=t=out:st={max(0, d - FADE)}:d={FADE}[a{i}]")
         labels.append(f"[v{i}][a{i}]")
     parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a=1[v][a]")
     graph = os.path.join(workdir, "cut.filtergraph")

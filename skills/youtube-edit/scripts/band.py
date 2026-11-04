@@ -26,6 +26,9 @@ overlays.json additions (alongside the usual canvas/face_box/cards/captions):
     {"id": "s2", "kind": "stat", "kicker": "The goal", "text": "3–5×", "sub": "in *4–6 years*", ...}
   ],                                    # *word* = accent colour; "font_px" overrides 104 for a line
   "broll": [{"file": "/abs/diesel.mp4", "start": 2.6, "end": 4.3, "src_in": 0.0}]
+                                        # edges snap to jump cuts within 0.3s; min 1.2s
+Short gaps between headline lines are filled by holding the previous line. In sound_plan.json an
+SFX with "broll": N (+ "offset") is re-timed to that insert's start.
                                         # covers the speaker region (y 420–1920), 1-frame fades
 Missing bboxes are filled in so check_plan.py can check them.
 """
@@ -45,6 +48,53 @@ def fps_of(path):
 def dur_of(path):
     return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
                                  "csv=p=0", path], capture_output=True, text=True).stdout.strip())
+
+
+def cut_times(workdir):
+    """Jump-cut times on the cut timeline (from edl_tight.json, else edl.json)."""
+    for n in ("edl_tight.json", "edl.json"):
+        p = os.path.join(workdir, n)
+        if os.path.exists(p):
+            t, out = 0.0, []
+            for sgm in json.load(open(p))["segments"]:
+                t += sgm["out"] - sgm["in"]
+                out.append(round(t, 3))
+            return out[:-1]
+    return []
+
+
+def snap_broll(ov, cuts, dur):
+    """A B-roll edge within 0.3s of a jump cut moves onto it (no flash frames of a new framing);
+    every insert lasts >= 1.2s (G1)."""
+    for b in ov.get("broll", []):
+        for k in ("start", "end"):
+            near = min(cuts, key=lambda c: abs(c - b[k]), default=None)
+            if near is not None and abs(near - b[k]) <= 0.3:
+                b[k] = near
+        if b["end"] - b["start"] < 1.2:   # stretch to a nearby cut, else exactly 1.2s
+            near = [c for c in cuts if b["start"] + 1.2 <= c <= b["start"] + 1.6]
+            b["end"] = round(min(near[0] if near else b["start"] + 1.2, dur), 3)
+
+
+def fill_gaps(cards, dur):
+    """Headline lines hold until the next one when the gap is short (an empty band reads as a
+    dropped line); the last line holds to the end."""
+    lines = sorted([c for c in cards if c.get("kind", "line") in ("line", "tag") and not c.get("persistent")],
+                   key=lambda c: c["start"])
+    for a, b in zip(lines, lines[1:]):
+        if 0 < b["start"] - a["end"] <= 1.6:
+            a["end"] = b["start"]
+    if lines and dur - lines[-1]["end"] <= 1.6:
+        lines[-1]["end"] = dur
+
+
+def keyed_logo(src, pub):
+    """Logos exported on black: key the black to transparency so no box shows on the band."""
+    os.makedirs(os.path.join(pub, "brand"), exist_ok=True)
+    rel = os.path.join("brand", os.path.splitext(os.path.basename(src))[0] + "_keyed.png")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf",
+                    "format=rgba,colorkey=0x000000:0.12:0.08", "-frames:v", "1", os.path.join(pub, rel)], check=True)
+    return rel
 
 
 def rich(text):
@@ -107,10 +157,20 @@ def main():
     stage(gsap, pub, "vendor")
     kick = br.get("kicker", {})
     if kick.get("image"):
-        kimg = stage(kick["image"], pub, "brand")
-        kicker_html = (f'<img src="{kimg}" style="width:{int(kick.get("width", 430))}px;mix-blend-mode:lighten" alt="">')
+        kimg = keyed_logo(kick["image"], pub)
+        kicker_html = f'<img src="{kimg}" style="width:{int(kick.get("width", 430))}px" alt="">'
     else:
         kicker_html = html.escape(kick.get("text", ""))
+
+    snap_broll(ov, cut_times(workdir), dur)
+    fill_gaps(ov["cards"], dur)
+    sp = os.path.join(workdir, "sound_plan.json")   # SFX tied to a B-roll insert follow it
+    if os.path.exists(sp):
+        plan = json.load(open(sp))
+        for x in plan.get("sfx", []):
+            if x.get("broll"):
+                x["at"] = round(ov["broll"][x["broll"] - 1]["start"] + x.get("offset", 0.0), 3)
+        json.dump(plan, open(sp, "w"), indent=1)
 
     # fill boxes for check_plan
     for c in ov["cards"]:
@@ -197,7 +257,7 @@ TEMPLATE = """<!doctype html>
       .card .tag .name {{ font-family: "{hfam}", sans-serif; font-size: 58px; letter-spacing: 0.06em; color: var(--text); line-height: 1; }}
       .card .tag .org {{ font-family: "{cfam}", sans-serif; font-weight: 600; font-size: 40px; color: var(--accent-0); margin-top: 6px; }}
       .caps-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
-      .caps-host .cap {{ position: absolute; left: 70px; right: 70px; text-align: center; white-space: nowrap;
+      .caps-host .cap {{ position: absolute; left: 110px; right: 110px; text-align: center; white-space: nowrap;
                         font-family: "{cfam}", sans-serif; font-weight: {cw}; font-size: 76px; line-height: 1.08;
                         letter-spacing: 0; word-spacing: 0.14em; color: #ffffff; -webkit-text-stroke: 12px #0a0a0a; paint-order: stroke fill;
                         text-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; }}
@@ -230,7 +290,7 @@ TEMPLATE = """<!doctype html>
             tl.set(host(id), {{ opacity: 0, visibility: "hidden" }}, q(e));
             if (k === "line" || k === "tag") {{   // rises out of the accent rule, sinks out (STYLE L3)
               tl.fromTo(el(id, "line"), {{ yPercent: 100, opacity: 0 }}, {{ yPercent: 0, opacity: 1, duration: 0.24, ease: "power3.out" }}, q(s));
-              tl.to(el(id, "line"), {{ yPercent: -60, opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
+              if (e < {dur} - 0.05) tl.to(el(id, "line"), {{ yPercent: -60, opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
             }} else if (k === "stat") {{
               tl.fromTo(el(id, "stat"), {{ opacity: 0 }}, {{ opacity: 1, duration: 0.14, ease: "power2.out" }}, q(s));
               tl.fromTo(el(id, "big"), {{ scale: 0.86, opacity: 0 }}, {{ scale: 1, opacity: 1, duration: 0.3, ease: "power3.out" }}, q(s + 0.04));
@@ -261,7 +321,7 @@ TEMPLATE = """<!doctype html>
             d.className = "cap"; d.id = "cap-" + i; d.style.top = y + "px";
             d.innerHTML = c.words.map(function (w) {{ return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t); }}).join(" ");
             host.appendChild(d);
-            const room = 940, base = parseFloat(getComputedStyle(d).fontSize);
+            const room = 860, base = parseFloat(getComputedStyle(d).fontSize);
             if (d.scrollWidth > room) d.style.fontSize = Math.max(62, Math.floor(base * room / d.scrollWidth)) + "px";
             tl.set(d, {{ yPercent: -50, opacity: 0 }}, 0);
             tl.set(d, {{ opacity: 1 }}, q(c.in));
