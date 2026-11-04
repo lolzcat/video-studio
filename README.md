@@ -45,6 +45,7 @@ Without `--deps` it only links the skills and reports what's missing. Safe to re
 | `yt-dlp` | pulling reference videos | `brew install yt-dlp` (on a YouTube 403, run `brew upgrade yt-dlp`) |
 | `uv` | runs the numpy scripts (`timing.py`, `gaps.py`, `sync_sheet.py`, `shots.py`) with their own deps | `brew install uv` |
 | Node 18+ | HyperFrames graphics renderer | `brew install node` |
+| `rubberband` (optional) | speeding clips up with the voice pitch kept (`"speed": 1.25`) | `brew install rubberband` |
 | `parakeet-mlx` | English transcription with word timings | `uv tool install parakeet-mlx --python 3.12` |
 | `mlx_whisper` | Chinese and other languages | `uv tool install mlx-whisper --python 3.12` |
 | HyperFrames plugin | animated graphics, captions, scoreboard | `claude plugin marketplace add heygen-com/hyperframes` then `claude plugin install hyperframes@hyperframes` |

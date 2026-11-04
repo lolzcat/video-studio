@@ -24,6 +24,9 @@ Top level (all optional):
   max_pause    shorten every pause inside kept segments to this many seconds and
                trim edge silence; writes edl_tight.json
   punch        punch-in used when alternating framing on jump cuts (default 1.15, Z1)
+  speed        e.g. 1.25: speed the whole cut up with the voice pitch kept (Premiere's
+               "Maintain Audio Pitch") — Rubber Band R3 if installed (brew install rubberband),
+               else ffmpeg atempo. Re-transcribe the cut afterwards as usual (timing truth).
   level_voice  true: gain-match every piece's speech level to the median (±6 dB), so lines
                joined from louder/quieter parts of a long recording don't step in volume
   zoom_region  [x, y, w, h] — punch in only inside this rect (e.g. the face half of a
@@ -65,6 +68,30 @@ def silences(src, cache={}):
         en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", log)]
         cache[src] = list(zip(st, en))
     return cache[src]
+
+
+def speed_up(path, speed, fps):
+    """Retime a rendered cut by `speed` in place: video PTS/speed at the same fps, voice
+    time-stretched with pitch kept."""
+    import shutil, tempfile
+    tmp = tempfile.mkdtemp(prefix="speed_", dir=os.path.dirname(os.path.abspath(path)))
+    src, wav, fast = os.path.join(tmp, "in.mp4"), os.path.join(tmp, "in.wav"), os.path.join(tmp, "fast.wav")
+    shutil.move(path, src)
+    if shutil.which("rubberband"):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "2", "-ar", "48000", wav], check=True)
+        subprocess.run(["rubberband", "-q", "-3", "-T", str(speed), wav, fast], check=True)  # R3: finest engine
+        audio_in, audio_f = ["-i", fast], []
+        engine = "rubberband R3"
+    else:
+        audio_in, audio_f = [], ["-af", f"atempo={speed}"]
+        engine = "ffmpeg atempo"
+    args = ["ffmpeg", "-v", "error", "-y", "-i", src, *audio_in, "-filter:v", f"setpts=PTS/{speed},fps={fps}",
+            "-map", "0:v", "-map", "1:a" if audio_in else "0:a", *audio_f,
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
+            "-shortest", path]
+    subprocess.run(args, check=True)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return engine
 
 
 def rms_db(src, a, b):
@@ -180,6 +207,9 @@ def main():
                     "-filter_complex_script", graph, "-map", "[v]", "-map", "[a]",
                     "-c:v", "libx264", "-preset", "medium", "-crf", "18",
                     "-c:a", "aac", "-b:a", "256k", "-ar", "48000", out], check=True)
+    speed = float(edl.get("speed", 1.0))
+    if abs(speed - 1.0) > 0.001:
+        print(f"speed {speed}x with pitch kept ({speed_up(out, speed, fps)})")
 
     mapped, offset, cache = [], 0.0, {}
     for idx, s in enumerate(segs):
@@ -192,6 +222,9 @@ def main():
                 mapped.append({**wd, "start": round(a - s["in"] + offset, 3),
                                "end": round(b - s["in"] + offset, 3), "seg": idx})
         offset += s["out"] - s["in"]
+    if abs(speed - 1.0) > 0.001:  # approximate until the re-ASR of the cut replaces it
+        mapped = [{**wd, "start": round(wd["start"] / speed, 3), "end": round(wd["end"] / speed, 3)} for wd in mapped]
+        offset /= speed
     json.dump(mapped, open(os.path.join(workdir, "words_cut.json"), "w"), indent=1)
     print(f"{len(segs)} segments from {len(sources)} source(s), {offset:.1f}s -> {out}")
 

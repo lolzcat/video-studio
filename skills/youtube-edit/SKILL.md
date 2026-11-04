@@ -94,6 +94,11 @@ Write `edl.json` with a `note` on each segment saying why it's kept.
   makes sense without setup (drop "And just like that…"); drop filler "now/so/so yeah" at
   line starts; no false outros ("So that's it", "In this video" in a short); end on the
   payoff word, then a short `"raw": true` silent tail (~0.5s) so the ending lands.
+- **Speed up** (Premiere's "Maintain Audio Pitch"): top-level `"speed": 1.25` speeds the whole cut
+  with the voice pitch kept — Rubber Band R3 (`brew install rubberband`; `install.sh --deps`
+  adds it), else ffmpeg `atempo`. Then re-transcribe the cut as always; if graphics already
+  exist, run `remap.py` (old → new words) so they follow. 1.25× suits slow talkers on shorts;
+  past ~1.3× speech starts to sound rushed.
 - Split recordings (screen top / face bottom): set `"zoom_region"` to the face rect so
   punch-ins don't crop the screen; `"punch": 1.15` (Z1). `cut.py` forces neighbouring
   segments to alternate 1.0 ↔ punch.

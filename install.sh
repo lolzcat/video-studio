@@ -30,6 +30,7 @@ if [ "$mode" = "--deps" ]; then
   have yt-dlp || pkgs+=(yt-dlp)
   have uv     || pkgs+=(uv)
   have node   || pkgs+=(node)
+  have rubberband || pkgs+=(rubberband)
   [ ${#pkgs[@]} -gt 0 ] && brew install "${pkgs[@]}"
   export PATH="$HOME/.local/bin:$PATH"
   have parakeet-mlx || uv tool install parakeet-mlx --python 3.12
@@ -72,6 +73,7 @@ if have node; then
   major="$(node -v | sed 's/^v\([0-9]*\).*/\1/')"
   [ "$major" -ge 18 ] && ok "node $(node -v)" || miss "node $(node -v)" "needs 18+: brew upgrade node"
 else miss node "brew install node"; fi
+have rubberband && ok "rubberband (pitch-kept speed-up)" || miss rubberband "brew install rubberband (optional: else ffmpeg atempo)"
 have parakeet-mlx && ok parakeet-mlx || miss parakeet-mlx "uv tool install parakeet-mlx --python 3.12"
 have mlx_whisper && ok mlx_whisper || miss mlx_whisper "uv tool install mlx-whisper --python 3.12 (only for non-English)"
 if ls "$HOME"/.claude/plugins/cache/hyperframes/hyperframes/*/skills/hyperframes/scripts/plugin-cli.mjs >/dev/null 2>&1; then
