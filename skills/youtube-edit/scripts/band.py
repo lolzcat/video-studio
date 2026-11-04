@@ -259,8 +259,8 @@ TEMPLATE = """<!doctype html>
       .caps-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
       .caps-host .cap {{ position: absolute; left: 110px; right: 110px; text-align: center; white-space: nowrap;
                         font-family: "{cfam}", sans-serif; font-weight: {cw}; font-size: 76px; line-height: 1.08;
-                        letter-spacing: 0; word-spacing: 0.14em; color: #ffffff; -webkit-text-stroke: 12px #0a0a0a; paint-order: stroke fill;
-                        text-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; }}
+                        letter-spacing: 0; word-spacing: 0.14em; color: #ffffff; -webkit-text-stroke: 15px #0a0a0a; paint-order: stroke fill;
+                        text-shadow: 0 4px 10px rgba(0,0,0,0.75), 0 0 22px rgba(0,0,0,0.45); opacity: 0; }}
       .caps-host .cap .em {{ color: var(--accent-0); }}
     </style>
   </head>

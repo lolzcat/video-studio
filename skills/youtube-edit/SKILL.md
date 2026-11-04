@@ -110,6 +110,10 @@ Then **re-transcribe the cut** and use that as the timing truth:
 python3 "$SKILL_DIR/scripts/transcribe.py" <workdir>/cut.mp4 <workdir>/cut_asr
 cp <workdir>/cut_asr/words.json <workdir>/words_cut.json
 ```
+**Re-cutting after graphics exist** (a moved in/out point, a new `max_pause`, a dropped word):
+keep the previous `words_cut.json`, re-transcribe, then
+`python3 "$SKILL_DIR/scripts/remap.py" <old words_cut.json> <new words_cut.json> <workdir>/overlays.json`
+before anything else — otherwise every card after the change lands late or early.
 Read `cut_asr/transcript.txt` as the viewer will hear it — any leftover fragment means a
 cut point is wrong (fix with `gaps.py`, re-cut). **All later timing — overlays, SFX,
 music — uses `words_cut.json`, never source times.** (cut.py's own remap is approximate.)

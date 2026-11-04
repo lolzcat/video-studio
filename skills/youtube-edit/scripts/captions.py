@@ -39,8 +39,8 @@ def tidy(word, fixes):
     core = re.sub(r"^[^\w$]+|[^\w%]+$", "", word)
     tail = word[len(word.rstrip(".,!?;:")):]
     fixed = fixes.get(core.lower())
-    if fixed:
-        word = fixed + tail
+    if fixed:   # a fix that brings its own punctuation replaces the tail ("portfolio" -> "portfolio.")
+        word = fixed if fixed[-1:] in ".,!?;:" else fixed + tail
     m = re.fullmatch(r"(\$?)(\d{4,})([.,!?]?)", word)
     if m:  # 1100 -> 1,100
         word = f"{m[1]}{int(m[2]):,}{m[3]}"
