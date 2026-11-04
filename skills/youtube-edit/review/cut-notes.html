@@ -1,0 +1,345 @@
+<title>Cut Notes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Layout: an edit bay — version rail on the left, the 9:16 monitor in the middle with a
+     scrub-able timeline under it, the note log beside it. Stacks on phones. */
+  :root {
+    --bg: #f3f2ef; --panel: #ffffff; --ink: #1d1c1a; --muted: #6d6a64; --line: #dedbd4;
+    --mark: #c26a00; --mark-soft: #f4e3cc; --done: #2f7d6d; --done-soft: #d8ece6; --skip: #8a8780;
+    --track: #e7e4dd; --playhead: #1d1c1a;
+    --f-ui: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --r: 10px;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #141413; --panel: #1d1c1a; --ink: #eceae5; --muted: #a29e95; --line: #34322e;
+    --mark: #f0a33a; --mark-soft: #3a2c18; --done: #5cc2ab; --done-soft: #173a33; --skip: #7d7a73;
+    --track: #2a2926; --playhead: #eceae5; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #141413; --panel: #1d1c1a; --ink: #eceae5; --muted: #a29e95; --line: #34322e;
+    --mark: #f0a33a; --mark-soft: #3a2c18; --done: #5cc2ab; --done-soft: #173a33; --skip: #7d7a73;
+    --track: #2a2926; --playhead: #eceae5; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.45;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px; display: flex; flex-direction: column; gap: 16px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .bay { display: grid; grid-template-columns: 220px minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { .bay { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+  /* version rail */
+  .rail { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .rail button { all: unset; cursor: pointer; display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; }
+  .rail button:hover { background: var(--track); }
+  .rail button[aria-current="true"] { background: var(--mark-soft); }
+  .rail button:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
+  .rail .t { font-weight: 600; font-size: 14px; }
+  .rail .m { font-size: 12px; color: var(--muted); font-family: var(--f-mono); }
+
+  /* monitor */
+  .monitor { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .screen { background: #000; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+  video { display: block; width: 100%; max-height: 68vh; aspect-ratio: 9 / 16; object-fit: contain; background: #000; }
+  .empty { aspect-ratio: 9 / 16; max-height: 68vh; width: 100%; display: grid; place-items: center; text-align: center;
+           color: #c9c6bf; padding: 24px; font-size: 14px; }
+  .transport { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tc { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .tc .dim { color: var(--muted); }
+  .btn { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; padding: 7px 12px; border-radius: 8px;
+         border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  .btn:hover { background: var(--track); }
+  .btn:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
+  .btn.primary { background: var(--mark); border-color: var(--mark); color: #fff; }
+  .btn[disabled] { opacity: 0.45; cursor: default; }
+
+  /* timeline */
+  .timeline { position: relative; height: 54px; cursor: pointer; touch-action: none; user-select: none; }
+  .timeline .track { position: absolute; left: 0; right: 0; top: 22px; height: 10px; border-radius: 5px; background: var(--track); }
+  .timeline .played { position: absolute; left: 0; top: 22px; height: 10px; border-radius: 5px; background: var(--line); }
+  .timeline .tick { position: absolute; top: 38px; font-family: var(--f-mono); font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+  .timeline .tickline { position: absolute; top: 34px; width: 1px; height: 4px; background: var(--muted); opacity: 0.5; }
+  .timeline .ph { position: absolute; top: 12px; width: 2px; height: 30px; background: var(--playhead); transform: translateX(-1px); pointer-events: none; }
+  .timeline .pin { position: absolute; top: 4px; width: 12px; height: 12px; border-radius: 50% 50% 50% 0; transform: translateX(-6px) rotate(-45deg);
+                   background: var(--mark); border: 2px solid var(--panel); }
+  .timeline .pin.applied { background: var(--done); }
+  .timeline .pin.skipped { background: var(--skip); }
+  .timeline:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 6px; }
+
+  /* composer + notes */
+  .notes { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .composer { display: flex; flex-direction: column; gap: 8px; }
+  .composer .at { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  textarea { width: 100%; min-height: 68px; resize: vertical; font: inherit; color: var(--ink); background: var(--bg);
+             border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+  textarea:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .list { display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
+  .note { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; display: grid; gap: 6px; }
+  .note.active { border-color: var(--mark); }
+  .note .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { all: unset; cursor: pointer; font-family: var(--f-mono); font-size: 12px; font-weight: 600; padding: 2px 7px;
+          border-radius: 6px; background: var(--mark-soft); color: var(--mark); }
+  .chip:focus-visible { outline: 2px solid var(--mark); }
+  .state { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+  .state.open { background: var(--mark-soft); color: var(--mark); }
+  .state.applied { background: var(--done-soft); color: var(--done); }
+  .state.skipped { background: var(--track); color: var(--skip); }
+  .who { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .reply { font-size: 13px; color: var(--muted); border-left: 2px solid var(--done); padding-left: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .linkish { all: unset; cursor: pointer; font-size: 12px; color: var(--muted); text-decoration: underline; }
+  .banner { font-size: 13px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Cut Notes</h1>
+    <span class="sub" id="status">Pause on a moment, write what to change. Claude reads every note and replies when it's applied.</span>
+  </header>
+
+  <div class="bay">
+    <nav class="panel rail" aria-label="Versions">
+      <span class="label">Versions</span>
+      <div id="versions"><p class="banner">Edits appear here as Claude uploads them.</p></div>
+    </nav>
+
+    <section class="panel monitor" aria-label="Player">
+      <div class="screen" id="screen">
+        <div class="empty" id="empty">No edit selected yet. When Claude uploads a version, pick it on the left.</div>
+        <video id="v" playsinline preload="metadata" hidden></video>
+      </div>
+      <div class="timeline" id="tl" tabindex="0" role="slider" aria-label="Timeline" aria-valuemin="0" aria-valuenow="0">
+        <div class="track"></div><div class="played" id="played"></div><div id="ticks"></div><div id="pins"></div>
+        <div class="ph" id="ph"></div>
+      </div>
+      <div class="transport">
+        <button class="btn" id="play" disabled>Play</button>
+        <button class="btn" id="back" disabled title="Back one frame (,)">‹ frame</button>
+        <button class="btn" id="fwd" disabled title="Forward one frame (.)">frame ›</button>
+        <span class="tc" id="tc">00:00.00 <span class="dim">/ 00:00.00</span></span>
+      </div>
+    </section>
+
+    <section class="panel notes" aria-label="Notes">
+      <div class="composer">
+        <div class="at"><span class="label">Note at <span class="tc" id="at">00:00.00</span></span>
+          <span class="hint">N to note · Space to play</span></div>
+        <textarea id="txt" placeholder="e.g. make the 226 bigger, cut this pause, the logo should pop in later" disabled></textarea>
+        <div class="row" style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <span class="hint" id="cstate">Enter adds the note · Shift+Enter for a new line</span>
+          <button class="btn primary" id="add" disabled>Add note</button>
+        </div>
+      </div>
+      <span class="label" id="count">Notes</span>
+      <div class="list" id="list"><p class="banner">No notes on this version yet.</p></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  const FPS = 30;
+  const $ = (id) => document.getElementById(id);
+  const v = $("v"), tl = $("tl");
+  let db = null, user = null, me = null, canWrite = true;
+  let videos = [], notes = [], current = null, unsubNotes = null, profiles = {};
+
+  const tc = (t) => {
+    t = Math.max(0, t || 0);
+    const m = Math.floor(t / 60), s = Math.floor(t % 60), f = Math.floor((t % 1) * FPS);
+    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0") + "." + String(f).padStart(2, "0");
+  };
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const dur = () => (isFinite(v.duration) && v.duration > 0 ? v.duration : (current && current.duration) || 0);
+
+  function setStatus(msg) { $("status").textContent = msg; }
+
+  // ---------- versions ----------
+  function renderVersions() {
+    const box = $("versions");
+    if (!videos.length) { box.innerHTML = '<p class="banner">Edits appear here as Claude uploads them.</p>'; return; }
+    box.innerHTML = "";
+    videos.forEach((vid) => {
+      const b = document.createElement("button");
+      b.setAttribute("aria-current", current && current.id === vid.id ? "true" : "false");
+      const open = notes.length && current && current.id === vid.id ? notes.filter((n) => n.status === "open").length : null;
+      b.innerHTML = `<span class="t">${esc(vid.title)}</span><span class="m">${esc(vid.version || "")}${vid.duration ? " · " + tc(vid.duration) : ""}${open !== null ? " · " + open + " open" : ""}</span>`;
+      b.addEventListener("click", () => select(vid.id));
+      box.appendChild(b);
+    });
+  }
+
+  function select(id) {
+    const vid = videos.find((x) => x.id === id);
+    if (!vid) return;
+    current = vid;
+    try { localStorage.setItem("cutnotes.current", id); } catch (e) {}
+    $("empty").hidden = true; v.hidden = false;
+    if (v.getAttribute("src") !== vid.url) { v.src = vid.url; v.load(); }
+    ["play", "back", "fwd"].forEach((b) => ($(b).disabled = false));
+    $("txt").disabled = !canWrite; $("add").disabled = !canWrite;
+    renderVersions();
+    subscribeNotes();
+  }
+
+  // ---------- notes ----------
+  function subscribeNotes() {
+    if (unsubNotes) unsubNotes();
+    notes = []; renderNotes();
+    if (!db || !current) return;
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) setStatus("Notes can't be reached yet. Showing what's loaded."); }, 10000);
+    unsubNotes = db.collection("notes").where("video", "==", current.id).onSnapshot((snap) => {
+      if (!snap.metadata.fromCache) { settled = true; clearTimeout(timer); }
+      notes = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.t - b.t);
+      resolveNames(); renderNotes(); renderPins(); renderVersions();
+    }, (e) => { clearTimeout(timer); setStatus("Notes stopped updating (" + e.code + "). Reload to reconnect."); });
+  }
+
+  async function resolveNames() {
+    if (!user || !user.profiles) return;
+    const ids = [...new Set(notes.map((n) => n.author).filter(Boolean))];
+    if (!ids.length) return;
+    try { profiles = await user.profiles(ids); renderNotes(); } catch (e) {}
+  }
+
+  function renderNotes() {
+    const list = $("list");
+    const open = notes.filter((n) => n.status === "open").length;
+    $("count").textContent = notes.length ? `Notes · ${open} open · ${notes.length - open} done` : "Notes";
+    if (!notes.length) { list.innerHTML = '<p class="banner">No notes on this version yet.</p>'; return; }
+    list.innerHTML = "";
+    const now = v.currentTime || 0;
+    notes.forEach((n) => {
+      const el = document.createElement("article");
+      el.className = "note" + (Math.abs(n.t - now) < 0.5 ? " active" : "");
+      const who = n.author === "claude" ? "Claude" : ((profiles[n.author] && profiles[n.author].name) || (n.author === me ? "You" : "Someone"));
+      el.innerHTML = `<div class="row"><button class="chip">${tc(n.t)}</button><span class="state ${esc(n.status)}">${esc(n.status)}</span><span class="who">${esc(who)}</span></div>
+        <div class="text"></div>${n.reply ? '<div class="reply"></div>' : ""}
+        ${n.author === me && n.status === "open" ? '<div class="row"><button class="linkish" data-del>Delete</button></div>' : ""}`;
+      el.querySelector(".text").textContent = n.text;
+      if (n.reply) el.querySelector(".reply").textContent = "Claude: " + n.reply;
+      el.querySelector(".chip").addEventListener("click", () => { v.pause(); v.currentTime = n.t; });
+      const del = el.querySelector("[data-del]");
+      if (del) del.addEventListener("click", async () => {
+        try { await db.doc("notes/" + n.id).delete(); } catch (e) { setStatus("Couldn't delete that note."); }
+      });
+      list.appendChild(el);
+    });
+  }
+
+  async function addNote() {
+    const text = $("txt").value.trim();
+    if (!text || !db || !current) return;
+    $("add").disabled = true;
+    try {
+      await db.collection("notes").add({ video: current.id, t: Math.round((v.currentTime || 0) * 1000) / 1000, text,
+        author: me || "anon", status: "open", reply: "", created: new Date().toISOString() });
+      $("txt").value = ""; $("cstate").textContent = "Added. Claude sees it next time it checks your notes.";
+    } catch (e) {
+      if (e && e.code === "invalid_argument") { canWrite = false; $("txt").disabled = true; $("cstate").textContent = "You can view notes on this page but not add them."; }
+      else $("cstate").textContent = "Couldn't save the note (" + (e && e.code) + "). Try again.";
+    } finally { $("add").disabled = !canWrite; }
+  }
+
+  // ---------- timeline ----------
+  function renderTicks() {
+    const d = dur(), box = $("ticks");
+    box.innerHTML = "";
+    if (!d) return;
+    const step = d > 120 ? 30 : d > 45 ? 10 : 5;
+    for (let s = 0; s <= d + 0.01; s += step) {
+      const x = (s / d) * 100;
+      box.insertAdjacentHTML("beforeend", `<div class="tickline" style="left:${x}%"></div><div class="tick" style="left:${x}%">${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}</div>`);
+    }
+    tl.setAttribute("aria-valuemax", String(Math.round(d)));
+  }
+  function renderPins() {
+    const d = dur(), box = $("pins");
+    box.innerHTML = "";
+    if (!d) return;
+    notes.forEach((n) => {
+      const p = document.createElement("div");
+      p.className = "pin " + (n.status || "open");
+      p.style.left = Math.min(100, (n.t / d) * 100) + "%";
+      p.title = tc(n.t) + " — " + n.text;
+      box.appendChild(p);
+    });
+  }
+  function renderHead() {
+    const d = dur(), t = v.currentTime || 0, x = d ? (t / d) * 100 : 0;
+    $("ph").style.left = x + "%"; $("played").style.width = x + "%";
+    $("tc").innerHTML = `${tc(t)} <span class="dim">/ ${tc(d)}</span>`;
+    $("at").textContent = tc(t);
+    tl.setAttribute("aria-valuenow", String(Math.round(t)));
+    document.querySelectorAll(".note").forEach((el, i) => el.classList.toggle("active", notes[i] && Math.abs(notes[i].t - t) < 0.5));
+  }
+  function seekFromEvent(e) {
+    const r = tl.getBoundingClientRect(), d = dur();
+    if (!d) return;
+    v.currentTime = Math.max(0, Math.min(d, ((e.clientX - r.left) / r.width) * d));
+  }
+  let dragging = false;
+  tl.addEventListener("pointerdown", (e) => { dragging = true; tl.setPointerCapture(e.pointerId); v.pause(); seekFromEvent(e); });
+  tl.addEventListener("pointermove", (e) => { if (dragging) seekFromEvent(e); });
+  tl.addEventListener("pointerup", () => { dragging = false; });
+  tl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") { v.currentTime = Math.min(dur(), v.currentTime + 1); e.preventDefault(); }
+    if (e.key === "ArrowLeft") { v.currentTime = Math.max(0, v.currentTime - 1); e.preventDefault(); }
+  });
+
+  v.addEventListener("loadedmetadata", () => { renderTicks(); renderPins(); renderHead(); });
+  v.addEventListener("timeupdate", renderHead);
+  v.addEventListener("seeked", renderHead);
+  v.addEventListener("play", () => ($("play").textContent = "Pause"));
+  v.addEventListener("pause", () => ($("play").textContent = "Play"));
+  v.addEventListener("error", () => setStatus("This version's video couldn't load. Ask Claude to re-upload it."));
+  $("play").addEventListener("click", () => (v.paused ? v.play().catch(() => {}) : v.pause()));
+  $("back").addEventListener("click", () => { v.pause(); v.currentTime = Math.max(0, v.currentTime - 1 / FPS); });
+  $("fwd").addEventListener("click", () => { v.pause(); v.currentTime = Math.min(dur(), v.currentTime + 1 / FPS); });
+  $("add").addEventListener("click", addNote);
+  $("txt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(); } });
+  $("txt").addEventListener("focus", () => v.pause());
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "TEXTAREA") return;
+    if (e.key === "n" || e.key === "N") { if (!$("txt").disabled) { e.preventDefault(); v.pause(); $("txt").focus(); } }
+    else if (e.key === " " && current) { e.preventDefault(); v.paused ? v.play().catch(() => {}) : v.pause(); }
+    else if (e.key === "," && current) { v.pause(); v.currentTime = Math.max(0, v.currentTime - 1 / FPS); }
+    else if (e.key === "." && current) { v.pause(); v.currentTime = Math.min(dur(), v.currentTime + 1 / FPS); }
+  });
+
+  // ---------- boot ----------
+  (async function boot() {
+    if (!window.claude || !window.claude.use) { setStatus("Open this page on claude.ai to load your edits and notes."); return; }
+    [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db) { setStatus("Sign in to see your edits and leave notes."); return; }
+    if (user) {
+      try { me = await user.id(); } catch (e) {}
+      try { const w = await user.can("data.write"); if (w === false) canWrite = false; } catch (e) {}
+    }
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) setStatus("Your edits can't be reached yet. Check back in a moment."); }, 10000);
+    db.collection("videos").orderBy("uploaded", "desc").onSnapshot((snap) => {
+      if (!snap.metadata.fromCache) { settled = true; clearTimeout(timer); }
+      videos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderVersions();
+      if (!current && videos.length) {
+        let want = null;
+        try { want = localStorage.getItem("cutnotes.current"); } catch (e) {}
+        select(videos.find((x) => x.id === want) ? want : videos[0].id);
+      } else if (current) {
+        const fresh = videos.find((x) => x.id === current.id);
+        if (fresh) current = fresh;
+      }
+    }, (e) => { clearTimeout(timer); setStatus("Edits stopped updating (" + e.code + "). Reload to reconnect."); });
+  })();
+})();
+</script>

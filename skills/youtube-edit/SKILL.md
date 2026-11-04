@@ -265,6 +265,14 @@ pinned to the exact frame of one version. The page's db: `videos/{id}` (Claude w
 admin) and `notes/{id}` (Andrew and Claude write) with
 `{video, t, text, author, status: open|applied|skipped, reply, created}`.
 
+Page source: [review/cut-notes.html](review/cut-notes.html). **If the URL above doesn't open
+for the current account** (new machine or someone else's account), publish your own copy once:
+`Artifact` publish `file_path` = `$SKILL_DIR/review/cut-notes.html`, `icon: "video"`,
+`capabilities: {"db": {"rules": [{"path": "videos", "read": "view", "write": "admin"}]},
+"user": {"scopes": ["profile"]}, "assets": {}}`. Use the URL it returns everywhere below and
+replace the URL in this file. Changing the page: edit `review/cut-notes.html` here, then
+republish with that `url` and no `capabilities` (keeps the stored ones); commit both.
+
 **Publishing a version for review** (after step 9, every version):
 1. Proxy: `ffmpeg -i final_vN.mp4 -vf scale=720:-2 -c:v libx264 -crf 26 -preset veryfast
    -c:a aac -b:a 128k -movflags +faststart <scratchpad>/cut-notes/<slug>-vN.mp4` (keep it
