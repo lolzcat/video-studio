@@ -218,6 +218,40 @@ names + licence source, reviewer verdict/score per round, any B-roll that couldn
 unsure about. Open the file for Andrew (`open <path>`) if he's at the machine.
 Version files `final_v1.mp4`, `final_v2.mp4`… never overwrite a delivered version.
 
+## Daily mode: one day's recording → three shorts
+For a daily series (e.g. "Day N/180 doing the boring stuff"), Andrew films once and posts
+three different formats (never three versions of one video; near-duplicates split reach).
+`scripts/daily.py` keeps the series state and the scoreboard; everything else is the normal
+pipeline run once per slot. `D` = `~/Movies/youtube-edit/series/<series>/day-NNN`.
+
+| slot | format | length | footage |
+|---|---|---|---|
+| `episode` | Day N scoreboard episode (event first → what happened → one ADHD moment → end-of-day scoreboard) | 40–50s | end-of-day check-in + the day's event recording |
+| `event` | one real outreach moment, shown not told (send / reply / booking), "POV:" or scoreboard label | 15–30s | screen recordings from the outreach block |
+| `dash` | one ADHD / boring-work reframe, one car take, captions above the head, no CTA | 12–16s | car one-liner takes |
+
+1. `python3 "$SKILL_DIR/scripts/daily.py" new <series>` opens the day (`init` once per series).
+   Andrew drops footage into `D/raw/{episode,event,dash}/`.
+2. `daily.py score <series> --sent N --replies N --booked N`: **today's** real numbers (totals
+   are computed). Numbers must match a screenshot in the footage (SF17).
+3. `daily.py prep <series>` transcribes every take per slot into `D/<slot>/takes/`.
+4. For each slot with footage, run steps 3–8b of this skill with `D/<slot>/` as the workdir
+   and `style short-form-v1.1` (each slot's `script.md` stub says its shape). Add the scoreboard:
+   `daily.py scoreboard <series> D/<slot>/public`, paste
+   [references/scoreboard-snippet.html](references/scoreboard-snippet.html), and add it to
+   `overlays.json` as a persistent card:
+   `{"id": "scoreboard", "persistent": true, "start": 0, "end": <dur>, "bbox": [60, 230, 960, 104],
+   "font_px": 40, "events": {"sent": <t>, "replies": <t>, "booked": <t>}}`. Episodes give event
+   times so the numbers tick up on the moment; event and dash clips omit `events` (static totals).
+   Keep `captions.y ≥ 440` so captions clear the band (it sits at y 230–334, below the platform UI).
+5. One independent review per slot is still required, but the **dash** slot can skip it when
+   plan check + QC pass (12–16s, one take).
+6. After posting (Andrew schedules natively in Instagram / TikTok / YouTube Studio; never
+   publish for him without an explicit OK per post): `daily.py log <series> --slot <slot>
+   --platform <p> --url <u>`. `daily.py status <series>` lists posts due a 24h/72h views check
+   and slots not posted. Judge formats on a week, not a post (SF22).
+If time runs short, drop `dash` first; `episode` and `event` carry the proof.
+
 ## Revisions (v2, v3…)
 Andrew's notes are usually timestamped ("at 0:22 the logo should be bigger"). Map each
 note to the step that owns it, re-run only from that step forward, and bump the version.

@@ -4,6 +4,8 @@
 Usage: check_plan.py <workdir> [--format hook|short|full]
 
 Reads <workdir>/overlays.json, sound_plan.json, and edl_tight.json (or edl.json).
+Cards with "persistent": true (scoreboard, series title) are exempt from one-at-a-time but
+must not be covered by another card or by captions.
 Exit 1 on any FAIL. Rule IDs refer to STYLE.md; thresholds are the STYLE.md values.
 """
 import json, os, re, sys
@@ -70,7 +72,15 @@ def main():
     for c in cards:
         if c["end"] - c["start"] < MIN_CARD:
             fails.append(f"G1 {c['id']} on screen {c['end'] - c['start']:.2f}s (< {MIN_CARD}s)")
-    for a, b in zip(cards, cards[1:]):
+    # Persistent labels (scoreboard, series title) sit on screen the whole video by design.
+    transient = [c for c in cards if not c.get("persistent")]
+    persistent = [c for c in cards if c.get("persistent")]
+    for p in persistent:
+        for c in transient:
+            if p.get("bbox") and c.get("bbox") and overlap(p["bbox"], c["bbox"]) > 0 \
+                    and c["start"] < p["end"] and c["end"] > p["start"]:
+                fails.append(f"G1 {c['id']} covers the persistent {p['id']} label — move one of them")
+    for a, b in zip(transient, transient[1:]):
         if b["start"] < a["end"] - 0.01:
             fails.append(f"G1 {a['id']} and {b['id']} overlap ({b['start']:.2f} < {a['end']:.2f})")
 

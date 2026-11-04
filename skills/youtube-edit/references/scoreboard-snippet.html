@@ -1,0 +1,65 @@
+<!--
+  Running scoreboard for a daily series (style short-form-v1.1 SF7). Data: scripts/daily.py
+  scoreboard <series> <workdir>/public → public/scoreboard.js (window.__SCORE).
+
+  Shows  DAY 7/180 · SENT 42 · REPLIES 3 · BOOKED 1  in a top band from frame 1.
+  Timing (optional, in overlays.json → timings.js as a "scoreboard" card):
+    "events": {"sent": 0.4, "replies": 38.2, "booked": 38.9}
+  → each number counts from yesterday's total to today's at that time and flashes the accent.
+  With no timing (event and dash clips), it shows today's totals static.
+
+  Paste: 1) style into <style>  2) host div inside #stage (after the video, before the cards)
+         3) the two scripts after the main timeline script. Set DURATION.
+  The band sits at y 230–334, below the Reels/TikTok top UI (~220px). Captions must not collide
+  with it: keep captions.y ≥ 440, and add {"id": "scoreboard", "persistent": true,
+  "bbox": [60, 230, 960, 104], ...} to overlays.json cards so check_plan checks it.
+-->
+
+<!-- 1) style -->
+<style>
+  .score-host { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }
+  .score-host .score {
+    position: absolute; left: 60px; right: 60px; top: 230px; height: 104px;
+    display: flex; align-items: center; justify-content: center; gap: 18px; white-space: nowrap;
+    background: rgba(11, 11, 15, 0.96); border-radius: 22px; color: #fff;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 36px;
+    letter-spacing: 0.02em; text-transform: uppercase; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  }
+  .score-host .score > span { display: inline-flex; align-items: baseline; white-space: nowrap; }
+  .score-host .score .sep { opacity: 0.45; }
+  .score-host .score .n { display: inline-block; min-width: 1ch; text-align: right; }
+  .score-host .score .lbl { color: #c8c8d0; font-weight: 600; margin-right: 12px; font-size: 30px; }
+</style>
+
+<!-- 2) host -->
+<div id="score-host" class="score-host clip" data-start="0" data-duration="DURATION" data-track-index="2">
+  <div class="score" id="score"></div>
+</div>
+
+<!-- 3) scripts -->
+<script src="scoreboard.js"></script>
+<script>
+  (function () {
+    const tl = window.__timelines && window.__timelines["talking-head-recut"];
+    const S = window.__SCORE;
+    if (!tl || !S) return;
+    const ev = (window.__T && window.__T.scoreboard) || {};
+    const q = (t) => Math.round(t * 30) / 30;
+    const box = document.getElementById("score");
+    const cells = [`<span><span class="lbl">Day</span><span class="n">${S.day}</span>/${S.total_days}</span>`];
+    S.labels.forEach(function (k) {
+      const start = ev[k] !== undefined ? S.before[k] : S.after[k];
+      cells.push(`<span><span class="lbl">${k}</span><span class="n" id="score-${k}">${start}</span></span>`);
+    });
+    box.innerHTML = cells.join('<span class="sep">·</span>');
+    S.labels.forEach(function (k) {
+      if (ev[k] === undefined || S.before[k] === S.after[k]) return;
+      const el = document.getElementById("score-" + k);
+      const o = { v: S.before[k] };
+      tl.to(o, { v: S.after[k], duration: Math.min(0.9, 0.15 + 0.02 * (S.after[k] - S.before[k])), ease: "power2.out",
+                 onUpdate: function () { el.textContent = Math.round(o.v); } }, q(ev[k]));
+      tl.fromTo(el, { color: "#ffffff" }, { color: getComputedStyle(document.documentElement).getPropertyValue("--accent-0") || "#7c5cff",
+                 duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out" }, q(ev[k]));
+    });
+  })();
+</script>
