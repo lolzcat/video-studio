@@ -6,6 +6,7 @@
 """Shot-by-shot breakdown of one pulled reference video (a pack folder from pull.py).
 
 Usage: shots.py <pack-video-dir> [--scene 0.25]
+(weaker scene changes are verified by before/after frame similarity; see the shots section)
 
 Writes into the folder:
   shots.json        every shot [{n, start, end, dur}] + word timing + audio read (below)
@@ -64,10 +65,44 @@ def main():
         sys.exit(f"no video.mp4 in {d} (video may have been blocked — audio-only pack)")
     dur = float(run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video]).stdout or 0)
 
-    # Shots: scene changes (0.25 also catches most jump cuts between framings)
+    # Letterboxed footage (phone filming a laptop, black bars) dilutes the scene score and
+    # hides cuts: detect the active picture area first and score only that.
+    crop = ""
+    cd = run(["ffmpeg", "-hide_banner", "-nostats", "-t", str(min(dur, 20)), "-i", video, "-an",
+              "-vf", "cropdetect=limit=24:round=2:reset=0", "-f", "null", "-"]).stderr
+    m = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", cd)
+    if m:
+        w, h, x, y = map(int, m[-1])
+        if h < 0.85 * int(run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                "stream=height", "-of", "csv=p=0", video]).stdout.strip() or h):
+            crop = f"crop={w}:{h}:{x}:{y},"
+    # Shots, two tiers: scene score >= --scene (0.25) is a cut. Weaker candidates (>= 0.12) —
+    # cuts between similar dark/letterboxed frames — count only if the frames 0.1s either
+    # side look different (correlation < 0.6). Handheld motion stays highly correlated
+    # (0.7–0.9) even when its scene score spikes, so it isn't mistaken for a cut.
     log = run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-an", "-vf",
-               f"scale=320:-2,select='gt(scene,{scene})',showinfo", "-f", "null", "-"]).stderr
-    cuts = [float(x) for x in re.findall(r"pts_time:([\d.]+)", log)]
+               f"{crop}scale=320:-2,select='gt(scene,0.12)',metadata=print:key=lavfi.scene_score:file=-",
+               "-f", "null", "-"]).stdout
+    cand = list(zip([float(x) for x in re.findall(r"pts_time:([\d.]+)", log)],
+                    [float(x) for x in re.findall(r"scene_score=([\d.]+)", log)]))
+
+    def gray(t):
+        b = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0, t):.3f}", "-i", video, "-frames:v", "1",
+                            "-vf", f"{crop}scale=48:48,format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout
+        return np.frombuffer(b, np.uint8).astype(float) if len(b) == 2304 else None
+
+    def similar(t):
+        a, b = gray(t - 0.1), gray(t + 0.1)
+        if a is None or b is None:
+            return 1.0
+        a, b = a - a.mean(), b - b.mean()
+        return float((a * b).sum() / (np.sqrt((a * a).sum() * (b * b).sum()) + 1e-9))
+
+    raw_cuts = [t for t, sc in cand if sc >= scene or similar(t) < 0.6]
+    cuts = []
+    for c in raw_cuts:  # a 1–2 frame flash produces two cuts ~0.03s apart: keep one
+        if not cuts or c - cuts[-1] > 0.1:
+            cuts.append(c)
     bounds = [0.0] + [c for c in cuts if 0.15 < c < dur - 0.1] + [dur]
     shots = [{"n": i + 1, "start": round(a, 2), "end": round(b, 2), "dur": round(b - a, 2)}
              for i, (a, b) in enumerate(zip(bounds, bounds[1:]))]
@@ -130,7 +165,7 @@ def main():
                 sfx.append({"at": round(t, 2), "on_cut": near_cut})
                 last = t
 
-    out = {"duration": round(dur, 2), "shots": shots, "cuts": len(shots) - 1,
+    out = {"duration": round(dur, 2), "letterbox_crop": crop.rstrip(",") or None, "shots": shots, "cuts": len(shots) - 1,
            "median_shot": round(float(np.median([s["dur"] for s in shots])), 2),
            "shots_first_3s": sum(1 for s in shots if s["start"] < 3),
            "pace_wpm_per_5s": pace, "pauses": pauses, "music": music, "sfx_candidates": sfx[:30]}
