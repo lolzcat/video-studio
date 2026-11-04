@@ -302,8 +302,12 @@ Aaron Darr). Workdir `~/Movies/youtube-edit/<date>-<show>-<guest>/`, one sub-fol
    laid over the speaker. Captions per K1/K2: `captions.y` ≈ 1410 (chest), `"plain": true`,
    `max_chars` 28. Then the usual `timing.py export` → `check_plan.py` → render → mix → QC →
    sync sheet → one independent review per clip (run the reviewers in parallel).
-7. **B-roll:** real footage/screens first (G6). For a metaphor with no real footage, generate it
-   on Oxen (photo/video only; see `~/.config/oxen/README.md`): read the model's `request_schema`
+7. **B-roll:** real footage/screens first (G6). For a metaphor with no real footage, generate it —
+   **ask Andrew first** with the shot list, model and cost (2026-11-04: "ask before"); read-only
+   lookups need no OK. Higgsfield (`mcp__higgsfield__*`, Plus plan) picks a model for you:
+   `models_explore` with `action: "recommend"`, `type: "video"` and a short query (long queries
+   return nothing) — top picks for text-only B-roll were Seedance 2.5, Kling 3.0 (`sound: "off"`
+   costs less), Cinema Studio 4.0. Or Oxen (photo/video only; see `~/.config/oxen/README.md`): read the model's `request_schema`
    and price first, queue with `POST /queue`, never retry an uncertain POST. MiniMax H3 text-to-
    video at 768P, `aspect_ratio` 3:4, 5s ≈ $0.44 per shot; prompt "cinematic, low-key, no
    text/logos/faces". Use 1–2.5s of each. Say in the delivery which shots are generated.
