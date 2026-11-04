@@ -44,6 +44,18 @@ blockers — say which fallback you're using.
 ### 1. Intake
 - `ffprobe` each input (duration, resolution, fps). Note whether it's a **hook**, a
   **short** (9:16) or a **full video** — pacing rules in STYLE.md differ.
+  Phone files are often stored sideways with a rotation flag (`stream_side_data=rotation`):
+  grab a frame to see the real orientation, not the stored width/height.
+- **Landscape footage for a short:** a full-height 9:16 crop of a close selfie leaves no room
+  for text that isn't on the face or under the platform UI. Use the **header band** layout
+  instead: a solid brand-colour band (y 0–420) with the speaker cropped 0.72:1 below it, built
+  once as `source_916.mp4`, e.g. `-filter_complex "[0:v]crop=778:1080:<x>:0,scale=1080:1500,
+  setsar=1[v];color=c=0x<band>:s=1080x420:r=<fps>,setsar=1[b];[b][v]vstack=inputs=2:shortest=1"`
+  (pick `<x>` so the face is centred). Cards then live in the band, captions go between the band
+  and the top of the head, and `edl.json` sets `"zoom_region": [0, 420, 1080, 1500]` so
+  punch-ins leave the band alone. First used: 2026-11-04 gigi-dress-code.
+- **Client videos** (not Andrew's channel): palette and fonts come from the client's brand
+  (their site's CSS tokens) instead of STYLE.md L1/L2; every other rule still applies.
 - Read any notes Andrew gave ("when I say zoom, zoom"; "show 3 animations"). Notes in
   the request beat STYLE.md for this edit only.
 - **If `<workdir>/script.md` exists** (from `/video-script`), read it: it is the intended
@@ -144,7 +156,8 @@ Output: `<workdir>/graphics.mp4`.
 **Captions (STYLE.md K1 — every short):** after `words_cut.json` is final (re-ASR of the cut),
 add a `"captions"` block to `overlays.json` — `y` (read it off a gridded frame: over cap/chin/
 chest, clear of cards and the platform UI), `fixes` (every ASR misspelling: product names,
-"revers"→"roofers"), `emphasis` (key words) — then:
+"revers"→"roofers"), `emphasis` (key words), and optionally `glue` (words a caption must not end on in this video,
+e.g. `["US", "ripped"]` so "US / Open" never splits) — then:
 ```bash
 python3 "$SKILL_DIR/scripts/captions.py" <workdir>
 ```

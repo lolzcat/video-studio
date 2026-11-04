@@ -49,6 +49,7 @@ apply them, and confirm/adjust them with Andrew.
 - **S4** SFX gain around -12 to -16 dB; nothing harsh or cartoonish. If the sync sheet says an SFX is buried under the voice, raise it in 3 dB steps up to -6 dB, or drop it.
 - **S6** *(candidate)* Every SFX must be heard within 40ms of its visual, and never BURIED (sync sheet SNR < -6 dB in its band) — raise it per S4 or drop it. "Faint" (-6..0 dB) is allowed only once it's at the S4 ceiling; list those for Andrew's ear.
 - **B1** *(candidate)* Graphic entries snap to the music beat when a beat is within ±80ms of the spoken word; never move a graphic further than that off the word.
+- **S7** *(candidate, 2026-11-04 gigi-dress-code)* A visual that lands while someone is talking gets a high-register SFX (soft chime/sparkle, `chime-soft-01`), not a pop: pops sit in the voice band and stayed BURIED even at -6 dB. If neither is audible at -6 dB, drop the SFX.
 - **S5** Final loudness -14 LUFS integrated, true peak ≤ -1 dBTP.
 
 ## Animation library
@@ -56,4 +57,5 @@ Reusable cards that have worked. Add an entry when Andrew likes one.
 Entries marked *(candidate)* were first used in v1 and are not yet approved by Andrew.
 - **Seam pill** *(candidate, 2026-11-03 roofer-leads)* — dark rounded pill on the screen/face seam, optional small uppercase kicker + 104px bold line with the key word in accent. In 0.24s power3.out from y+28 / scale 0.92; out 0.18s. Numbers count up (0.8–0.9s). SFX: soft pop at entry.
 - **Tool stack** *(candidate)* — 2–3 stacked rows naming tools, each popping in on its spoken word; recommended one gets accent outline + "Best for price"-style badge. SFX: pop on first and last row only.
+- **Header band line** *(candidate, 2026-11-04 gigi-dress-code)* — for landscape footage reframed to 9:16: solid brand band at y 0–420 with a small spaced-caps kicker (40px) and a 6px accent rule along its bottom edge that draws in at 0s. One 104px condensed line at a time rises out of the rule (yPercent 100→0, 0.24s power3.out) on its spoken word and sinks out (0.16s); key word in the accent. Lists become outlined chips that pop in on each word. SFX: whoosh on the first line, chime on the payoff.
 - **Real-site B-roll** *(candidate)* — screenshot of the real site covering the screen half, slow push-in to 1.06, pill caption with domain. SFX: soft whoosh.

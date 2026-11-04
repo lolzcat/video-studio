@@ -9,7 +9,8 @@ Reads <workdir>/words_cut.json (ASR of the cut) and the optional "captions" bloc
     "y": 1310,                       # centre line of the caption band (px); default 68% of height
     "fixes": {"revers": "roofers", "Reune": "Reoon"},   # ASR spelling fixes (case-insensitive)
     "emphasis": ["Lumrid", "free"],  # words shown in the accent colour (numbers always are)
-    "max_words": 4
+    "max_words": 4,
+    "glue": ["US", "ripped"]         # never end a caption on these here ("US / Open")
   }
 Writes:
   <workdir>/public/captions.js   window.__CAPS = [{in, out, words: [{t, em}]}]   (composition reads it)
@@ -57,6 +58,8 @@ def main():
     fixes = {k.lower(): v for k, v in cfg.get("fixes", {}).items()}
     emph = {re.sub(r"[^\w$%']", "", e).lower() for e in cfg.get("emphasis", [])}
     max_w, max_s, gap = arg("--max-words", int(cfg.get("max_words", 4))), arg("--max-s", 2.2), arg("--gap", 0.45)
+    # "glue": words that must stay with the next one for this video ("US" Open, "ripped" jeans)
+    weak = WEAK | {g.lower() for g in cfg.get("glue", [])}
 
     words = [w for w in words if re.sub(r"\W", "", w["text"]).lower() not in FILLER]
     groups, cur = [], []
@@ -72,7 +75,7 @@ def main():
             cur = []
         elif long:
             carry = []  # forced break: don't strand weak words at the end of the line
-            while len(cur) > 2 and re.sub(r"[^\w']", "", cur[-1]["text"]).lower() in WEAK:
+            while len(cur) > 2 and re.sub(r"[^\w']", "", tidy(cur[-1]["text"], fixes)).lower() in weak:
                 carry.insert(0, cur.pop())
             groups.append(cur)
             cur = carry
@@ -110,7 +113,19 @@ def main():
             t = tidy(w["text"], fixes)
             bare = re.sub(r"[^\w$%']", "", t).lower()
             ws.append({"t": t, "em": bool(re.search(r"\d", t)) or bare in emph})
+        # A cut that starts mid-sentence ("[Regarding the] dress code…") still opens a sentence on screen.
+        if ws and (not caps or re.search(r"[.?!]$", caps[-1]["words"][-1]["t"])):
+            ws[0]["t"] = ws[0]["t"][:1].upper() + ws[0]["t"][1:]
         caps.append({"in": round(t_in, 3), "out": round(max(t_out, t_in + 0.3), 3), "words": ws})
+
+    cut = os.path.join(workdir, "cut.mp4")  # no cue may outlast the video (last one gets +0.5s)
+    if os.path.exists(cut) and caps:
+        import subprocess
+        dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                    "csv=p=0", cut], capture_output=True, text=True).stdout.strip() or 0)
+        if dur:
+            for c in caps:
+                c["out"] = round(min(c["out"], dur - 0.05), 3)
 
     pub = os.path.join(workdir, "public")
     os.makedirs(pub, exist_ok=True)
@@ -121,7 +136,7 @@ def main():
         for n, c in enumerate(caps, 1):
             f.write(f"{n}\n{srt_time(c['in'])} --> {srt_time(c['out'])}\n{' '.join(w['t'] for w in c['words'])}\n\n")
     print(f"{len(caps)} caption groups from {len(words)} words -> {pub}/captions.js, {workdir}/captions.srt")
-    for c in caps[:6]:
+    for c in caps:
         print(f"  {c['in']:6.2f}-{c['out']:6.2f}  " + " ".join(("*" + w["t"] + "*") if w["em"] else w["t"] for w in c["words"]))
 
 

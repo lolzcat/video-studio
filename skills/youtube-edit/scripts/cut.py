@@ -41,11 +41,17 @@ MIN_SAVE = 0.15  # only jump-cut a pause if it saves >= 150 ms (smaller cuts rea
 
 def probe(video):
     out = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0",
-                                   "-show_entries", "stream=width,height,r_frame_rate",
-                                   "-of", "json", video])
+                                   "-show_entries", "stream=width,height,r_frame_rate:"
+                                   "stream_side_data=rotation", "-of", "json", video])
     s = json.loads(out)["streams"][0]
     num, den = s["r_frame_rate"].split("/")
-    return s["width"], s["height"], float(num) / float(den)
+    w, h = s["width"], s["height"]
+    # Phone footage is often stored sideways with a rotation flag; ffmpeg auto-rotates on
+    # decode, so the frames we filter are the displayed size, not the stored one.
+    rot = next((abs(int(d.get("rotation", 0))) for d in s.get("side_data_list", [])), 0)
+    if rot % 180 == 90:
+        w, h = h, w
+    return w, h, float(num) / float(den)
 
 
 def silences(src, cache={}):
