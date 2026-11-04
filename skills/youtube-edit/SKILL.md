@@ -266,6 +266,41 @@ pipeline run once per slot. `D` = `~/Movies/youtube-edit/series/<series>/day-NNN
    and slots not posted. Judge formats on a week, not a post (SF22).
 If time runs short, drop `dash` first; `episode` and `event` carry the proof.
 
+## Clips mode: long-form episode → short-form clips
+For "make clips from this podcast/interview" (first used 2026-11-04 on 9-Figure Exits ×
+Aaron Darr). Workdir `~/Movies/youtube-edit/<date>-<show>-<guest>/`, one sub-folder per clip.
+1. **Pull + brand.** `yt-dlp -f "bv*[height<=1080][ext=mp4]+ba[ext=m4a]" --merge-output-format mp4`
+   into `raw/episode.mp4` (only the client's own episodes, or with their OK). Get the brand from
+   the client's site: theme CSS tokens (Elementor `--e-global-color-*`/`-typography-*`, Tailwind
+   tokens, `:root` vars), the logo, and Google Fonts files into `brand/`.
+2. **Transcribe the whole episode** once (`transcribe.py`, background; ~1 min per 10 min).
+3. **Pick quotes.** Read `transcript.txt` and shortlist 5–8 standalone moments: a metaphor, a
+   number, a contrarian line, a rule they live by. Each must make sense with no setup, land a
+   payoff in < 30s, and come from the guest's own words. Rank them; edit the top 3 unless told
+   otherwise and list the rest with timestamps.
+4. **Look at the frame.** Remote shows are usually side-by-side (host left, guest right, split at
+   x 960): crop the speaker's half 0.72:1 (e.g. `crop=648:900:<x>:180` for a seated guest) under a
+   420px brand band (header-band layout above). One `source_916.mp4` per clip window
+   (`-ss <a> -to <b>`, a few seconds of margin), then `transcribe.py` on it so times are local.
+5. **Paper edit per clip:** open on the strongest line (H1) and keep their words and meaning —
+   reorder only when the meaning holds, drop hedges never (A1). ASR invents "um/but/and" at
+   joins: confirm every join on the cut with Whisper
+   (`mlx_whisper <slice.wav> --model mlx-community/whisper-large-v3-turbo --word-timestamps True`)
+   and delete phantom words from `words_cut.json`; Parakeet slice timings can run ~0.2s early.
+6. **Graphics:** write `overlays.json` with a `brand` block, headline cards (`*word*` = accent),
+   an optional name tag (`kind: "tag"`) and stat cutaways (`kind: "stat"`), plus `broll`; then
+   `python3 "$SK/scripts/band.py" <clip>` builds `public/index.html` + the picture with B-roll
+   laid over the speaker. Captions per K1/K2: `captions.y` ≈ 1410 (chest), `"plain": true`,
+   `max_chars` 28. Then the usual `timing.py export` → `check_plan.py` → render → mix → QC →
+   sync sheet → one independent review per clip (run the reviewers in parallel).
+7. **B-roll:** real footage/screens first (G6). For a metaphor with no real footage, generate it
+   on Oxen (photo/video only; see `~/.config/oxen/README.md`): read the model's `request_schema`
+   and price first, queue with `POST /queue`, never retry an uncertain POST. MiniMax H3 text-to-
+   video at 768P, `aspect_ratio` 3:4, 5s ≈ $0.44 per shot; prompt "cinematic, low-key, no
+   text/logos/faces". Use 1–2.5s of each. Say in the delivery which shots are generated.
+8. **Deliver:** each clip on Cut Notes (one `videos` doc per clip), plus the shortlist of
+   unedited quotes with timestamps.
+
 ## Revisions (v2, v3…)
 Andrew's notes are usually timestamped ("at 0:22 the logo should be bigger"). Map each
 note to the step that owns it, re-run only from that step forward, and bump the version.

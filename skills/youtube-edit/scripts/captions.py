@@ -12,7 +12,8 @@ Reads <workdir>/words_cut.json (ASR of the cut) and the optional "captions" bloc
     "max_words": 4,
     "glue": ["US", "ripped"],        # never end a caption on these here ("US / Open")
     "max_merge": 4,                  # short groups merge up to this many words (default max_words+3)
-    "max_chars": 22                  # one line only: break/merge by characters (76px Inter ≈ 22)
+    "max_chars": 22,                 # one line only: break/merge by characters (76px Inter ≈ 22)
+    "plain": true                    # K2: no accent words when a headline card owns the accent
   }
 Writes:
   <workdir>/public/captions.js   window.__CAPS = [{in, out, words: [{t, em}]}]   (composition reads it)
@@ -68,6 +69,8 @@ def main():
     # "max_chars": keep every caption on one line — break a group before it would pass this many
     # characters, and never merge past it (~22 for 76px Inter across 940px)
     max_chars = cfg.get("max_chars")
+    # "plain": no accent words at all (K2: a headline card owns the accent colour)
+    plain = bool(cfg.get("plain", False))
 
     def chars(g):
         return len(" ".join(tidy(x["text"], fixes) for x in g))
@@ -129,7 +132,7 @@ def main():
         for w in g:
             t = tidy(w["text"], fixes)
             bare = re.sub(r"[^\w$%']", "", t).lower()
-            ws.append({"t": t, "em": bool(re.search(r"\d", t)) or bare in emph})
+            ws.append({"t": t, "em": not plain and (bool(re.search(r"\d", t)) or bare in emph)})
         # A cut that starts mid-sentence ("[Regarding the] dress code…") still opens a sentence on screen.
         if ws and (not caps or re.search(r"[.?!]$", caps[-1]["words"][-1]["t"])):
             ws[0]["t"] = ws[0]["t"][:1].upper() + ws[0]["t"][1:]

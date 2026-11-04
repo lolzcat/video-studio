@@ -96,7 +96,8 @@ def main():
         t += s["out"] - s["in"]
         cuts.append(t)
     visuals = [(c["start"], c["id"]) for c in ov["cards"]] + \
-              [(v, f"{c['id']}.{k}") for c in ov["cards"] for k, v in c.get("events", {}).items()]
+              [(v, f"{c['id']}.{k}") for c in ov["cards"] for k, v in c.get("events", {}).items()] + \
+              [(b["start"], f"broll{i + 1}") for i, b in enumerate(ov.get("broll", []))]  # band.py B-roll
     stem_dir = os.path.join(os.path.dirname(os.path.abspath(video)), "stems")
     sp, rp = os.path.join(stem_dir, "sfx.wav"), os.path.join(stem_dir, "rest.wav")
     stems = (load_mono(sp), load_mono(rp)) if os.path.exists(sp) and os.path.exists(rp) else None

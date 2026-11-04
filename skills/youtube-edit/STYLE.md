@@ -35,6 +35,7 @@ apply them, and confirm/adjust them with Andrew.
 
 ## Captions
 - **K1** *(candidate, from the "Six months" reference)* Shorts get burned-in captions on every spoken line: 2–4 words per group (max 7 when merging), ≥ 0.5s on screen, never ending on a weak word ("the", "with"…); white Inter 700 76px with a dark outline, numbers and key words in the accent colour; ASR misspellings fixed (product names, numbers as "1,100"). Band sits over cap/chin/chest, never eyes or mouth; never collides with a card; inside the Reels/TikTok safe area (y 220–1500 on 1920, clear of the right-side buttons). Captions stay on while a card repeats the same words (Andrew, 2026-11-03: keep both).
+- **K2** Captions and headline cards never compete (Andrew, 2026-11-04, on the Gigi header-band video: "subtitles clashing with the word emphasis up top"). When a layout has headline text (header band, title card), captions go **low**: chest height, just above the platform's bottom UI (≈ y 1350–1480), never directly under the headline. Captions then stay **plain white, no accent words**; the accent colour belongs to the headline only. Keep both on screen (K1), just apart.
 
 ## Look
 - **L1** Palette: near-black `#0B0B0F` cards, white `#FFFFFF` text, one accent `#7C5CFF`. Accent only for the key word.

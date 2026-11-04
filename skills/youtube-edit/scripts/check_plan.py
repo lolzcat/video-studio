@@ -4,8 +4,10 @@
 Usage: check_plan.py <workdir> [--format hook|short|full]
 
 Reads <workdir>/overlays.json, sound_plan.json, and edl_tight.json (or edl.json).
-Cards with "persistent": true (scoreboard, series title) are exempt from one-at-a-time but
-must not be covered by another card or by captions.
+Cards with "persistent": true (scoreboard, series title) and lower-third name tags (kind "tag")
+are exempt from one-at-a-time but must not be covered by another card or by captions.
+Cutaways (kind "stat", or "cutaway": true) replace the picture like B-roll: they may cover the
+face box, and captions are meant to sit on top of them.
 Exit 1 on any FAIL. Rule IDs refer to STYLE.md; thresholds are the STYLE.md values.
 """
 import json, os, re, sys
@@ -73,8 +75,9 @@ def main():
         if c["end"] - c["start"] < MIN_CARD:
             fails.append(f"G1 {c['id']} on screen {c['end'] - c['start']:.2f}s (< {MIN_CARD}s)")
     # Persistent labels (scoreboard, series title) sit on screen the whole video by design.
-    transient = [c for c in cards if not c.get("persistent")]
-    persistent = [c for c in cards if c.get("persistent")]
+    layered = lambda c: c.get("persistent") or c.get("kind") == "tag"
+    transient = [c for c in cards if not layered(c)]
+    persistent = [c for c in cards if layered(c)]
     for p in persistent:
         for c in transient:
             if p.get("bbox") and c.get("bbox") and overlap(p["bbox"], c["bbox"]) > 0 \
@@ -93,7 +96,8 @@ def main():
             warns.append(f"T1 {c['id']} has no font_px declared — can't check readability")
         elif fp * 1080 / width < MIN_FONT_1080:
             fails.append(f"T1 {c['id']} smallest text {fp}px (< {MIN_FONT_1080}px at 1080 wide) — unreadable on a phone")
-        if face and c.get("bbox"):
+        cutaway = c.get("kind") == "stat" or c.get("cutaway")
+        if face and c.get("bbox") and not cutaway:
             o = overlap(face, c["bbox"])
             if o > 0.02 * c["bbox"][2] * c["bbox"][3]:
                 fails.append(f"G3 {c['id']} covers the face box ({o / (c['bbox'][2] * c['bbox'][3]):.0%} of the card)")
@@ -109,8 +113,8 @@ def main():
         cy = int(ym.group(1)) if ym and ym.group(1) != "null" else int(H * 0.68)
         band = [70, cy - CAP_HALF_H, W - 140, 2 * CAP_HALF_H]
         for c in cards:
-            if not c.get("bbox"):
-                continue
+            if not c.get("bbox") or c.get("kind") == "stat" or c.get("cutaway"):
+                continue  # captions sit on top of a cutaway, like on B-roll
             hit = [k for k in caps if k["in"] < c["end"] and k["out"] > c["start"]]
             if hit and overlap(band, c["bbox"]) > 0:
                 fails.append(f"K1 captions (y {cy}) collide with {c['id']} while both are on screen — "

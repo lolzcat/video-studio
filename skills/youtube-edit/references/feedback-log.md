@@ -22,3 +22,4 @@ One line per note: `YYYY-MM-DD | video | raw note | → rule ID (added/changed/r
 2026-11-03 | roofer-leads | reviewers disagreed on the ending (r1: end on "leads"; r3: keep "that we can sell to") | → taste call for Andrew
 2026-11-03 | six-months reference + roofer v6 | (Andrew: "Yes, add captions") — reference reel captions every line; pipeline had none | → K1 (candidate), captions.py + captions-snippet.html, check_plan K1 collision + Reels/TikTok UI-zone checks
 2026-11-03 | roofer v6 | Andrew: "Keep both" — captions stay on even when a card shows the same words | → K1 amended (Andrew-approved detail)
+2026-11-04 | gigi-dress-code v4 | Andrew: "Subtitles clashing with the word emphasis up top" — captions at y 530 sat right under the band headline, both with gold emphasis | → K2: captions low (chest, above bottom UI), plain white, accent only in the headline

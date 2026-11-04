@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Header-band short: build the HyperFrames composition and the picture from overlays.json.
+
+Usage: band.py <workdir>
+
+For the header-band layout (SKILL.md → Intake): source_916.mp4 has a solid brand band at
+y 0–420 and the speaker below it. This writes, from <workdir>/overlays.json:
+  public/index.html        band kicker (logo or text) + accent rule + one headline line at a
+                           time + full-region stat cutaways + name tag + captions (K1/K2)
+  public/input-video.mp4   cut.mp4 with any B-roll laid over the speaker region
+  public/fonts, brand, vendor   copied assets
+Then run timing.py export (writes timings.js, syncs card-host data-start/duration) and render.
+
+overlays.json additions (alongside the usual canvas/face_box/cards/captions):
+  "brand": {
+    "band": "#0A0A0A", "text": "#FFFFFF", "accent": "#C9A84C",
+    "head_font": {"family": "Bebas Neue", "file": "/abs/BebasNeue-Regular.ttf", "weight": 400},
+    "cap_font":  {"family": "DM Sans", "file": "/abs/DMSans.ttf", "weight": 700},
+    "kicker": {"image": "/abs/logo.png", "width": 430}      # or {"text": "WIMBLEDON FAQ"}
+  },
+  "cards": [
+    {"id": "c1", "start": 0.1, "end": 2.4, "text": "Never lose *money*"},          # kind "line" (default)
+    {"id": "s1", "kind": "stat", "start": 9.0, "end": 11.4, "text": "3–5×", "sub": "In 4–6 years"},
+    {"id": "n1", "kind": "tag", "start": 0.3, "end": 3.0, "text": "Aaron Darr", "sub": "Lead Edge Capital"}
+  ],                                    # *word* = accent colour; "font_px" overrides 104 for a line
+  "broll": [{"file": "/abs/diesel.mp4", "start": 2.6, "end": 4.3, "src_in": 0.0}]
+                                        # covers the speaker region (y 420–1920) with 0.12s fades
+Missing bboxes are filled in so check_plan.py can check them.
+"""
+import html, json, os, re, shutil, subprocess, sys
+
+REGION = [0, 420, 1080, 1500]   # speaker region under the band
+LINE_BOX = [60, 300, 960, 116]
+TAG_BOX = [60, 448, 620, 112]
+
+
+def dur_of(path):
+    return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                 "csv=p=0", path], capture_output=True, text=True).stdout.strip())
+
+
+def rich(text):
+    """'Never lose *money*' -> escaped HTML with accent spans."""
+    out, parts = [], re.split(r"(\*[^*]+\*)", text)
+    for p in parts:
+        if p.startswith("*") and p.endswith("*"):
+            out.append(f'<span class="accent">{html.escape(p[1:-1])}</span>')
+        else:
+            out.append(html.escape(p))
+    return "".join(out)
+
+
+def stage(src, pub, sub):
+    os.makedirs(os.path.join(pub, sub), exist_ok=True)
+    dst = os.path.join(sub, os.path.basename(src))
+    shutil.copy2(src, os.path.join(pub, dst))
+    return dst
+
+
+def picture(workdir, ov):
+    cut = os.path.join(workdir, "cut.mp4")
+    out = os.path.join(workdir, "public", "input-video.mp4")
+    broll = ov.get("broll", [])
+    if not broll:
+        shutil.copy2(cut, out)
+        return
+    x, y, w, h = REGION
+    args, chain, last = ["ffmpeg", "-v", "error", "-y", "-i", cut], [], "[0:v]"
+    for i, b in enumerate(broll, 1):
+        args += ["-i", b["file"]]
+        d = b["end"] - b["start"]
+        s_in = b.get("src_in", 0.0)
+        chain.append(
+            f"[{i}:v]trim={s_in}:{s_in + d + 0.05},setpts=PTS-STARTPTS+{b['start']}/TB,"
+            f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,format=yuva420p,"
+            f"fade=t=in:st={b['start']}:d=0.12:alpha=1,fade=t=out:st={b['end'] - 0.12}:d=0.12:alpha=1[b{i}]")
+        chain.append(f"{last}[b{i}]overlay={x}:{y}:eof_action=pass:enable='between(t,{b['start']},{b['end']})'[v{i}]")
+        last = f"[v{i}]"
+    args += ["-filter_complex", ";".join(chain), "-map", last, "-map", "0:a", "-c:v", "libx264", "-crf", "16",
+             "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", out]
+    subprocess.run(args, check=True)
+
+
+def main():
+    workdir = os.path.abspath(sys.argv[1])
+    pub = os.path.join(workdir, "public")
+    ovp = os.path.join(workdir, "overlays.json")
+    ov = json.load(open(ovp))
+    br = ov["brand"]
+    dur = round(dur_of(os.path.join(workdir, "cut.mp4")), 3)
+    os.makedirs(pub, exist_ok=True)
+
+    hf, cf = br["head_font"], br["cap_font"]
+    hfile, cfile = stage(hf["file"], pub, "fonts"), stage(cf["file"], pub, "fonts")
+    gsap = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "vendor", "gsap.min.js")
+    if not os.path.exists(gsap):
+        sys.exit(f"missing {gsap}")
+    stage(gsap, pub, "vendor")
+    kick = br.get("kicker", {})
+    if kick.get("image"):
+        kimg = stage(kick["image"], pub, "brand")
+        kicker_html = f'<img src="{kimg}" style="width:{int(kick.get("width", 430))}px" alt="">'
+    else:
+        kicker_html = html.escape(kick.get("text", ""))
+
+    # fill boxes for check_plan
+    for c in ov["cards"]:
+        kind = c.get("kind", "line")
+        if kind == "line":
+            c.setdefault("bbox", LINE_BOX)
+            c.setdefault("font_px", 104)
+        elif kind == "stat":
+            c.setdefault("bbox", REGION)
+            c.setdefault("font_px", 64)
+        elif kind == "tag":
+            c.setdefault("bbox", TAG_BOX)
+            c.setdefault("font_px", 40)
+    json.dump(ov, open(ovp, "w"), indent=1, ensure_ascii=False)
+
+    hosts = []
+    for c in ov["cards"]:
+        kind, cid = c.get("kind", "line"), c["id"]
+        if c.get("persistent"):
+            continue
+        attrs = (f'class="card-host clip" data-card-id="{cid}" data-start="{c["start"]}" '
+                 f'data-duration="{round(c["end"] - c["start"], 3)}" data-track-index="3" '
+                 'style="visibility:hidden;opacity:0;"')
+        if kind == "line":
+            fs = f' style="font-size:{int(c["font_px"])}px"' if c.get("font_px", 104) != 104 else ""
+            inner = f'<div class="slot"><div class="line" id="{cid}-line"{fs}>{rich(c["text"])}</div></div>'
+        elif kind == "stat":
+            inner = (f'<div class="stat" id="{cid}-stat"><div class="big" id="{cid}-big">{rich(c["text"])}</div>'
+                     f'<div class="sub" id="{cid}-sub">{rich(c.get("sub", ""))}</div></div>')
+        else:
+            inner = (f'<div class="tag" id="{cid}-tag"><div class="name">{rich(c["text"])}</div>'
+                     f'<div class="org">{rich(c.get("sub", ""))}</div></div>')
+        hosts.append(f'      <div {attrs}>\n        <div class="card" data-card-id="{cid}" data-kind="{kind}">{inner}</div>\n      </div>')
+
+    kinds = {c["id"]: c.get("kind", "line") for c in ov["cards"] if not c.get("persistent")}
+    caps_y = int(ov.get("captions", {}).get("y", 1410))
+    page = TEMPLATE.format(
+        dur=dur, band=br["band"], text=br["text"], accent=br["accent"],
+        hfam=hf["family"], hfile=hfile, hw=hf.get("weight", 400),
+        cfam=cf["family"], cfile=cfile, cw=cf.get("weight", 700),
+        kicker=kicker_html, hosts="\n".join(hosts), kinds=json.dumps(kinds), caps_y=caps_y,
+        end_beat=round(max(0.0, dur - 0.55), 3))
+    open(os.path.join(pub, "index.html"), "w").write(page)
+    picture(workdir, ov)
+    print(f"band composition: {len(hosts)} cards, {len(ov.get('broll', []))} B-roll, {dur}s -> {pub}/index.html")
+
+
+TEMPLATE = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {{ font-family: "{hfam}"; src: url("{hfile}"); font-weight: {hw}; font-display: block; }}
+      @font-face {{ font-family: "{cfam}"; src: url("{cfile}"); font-weight: 100 900; font-display: block; }}
+      :root {{ --band: {band}; --text: {text}; --accent-0: {accent}; }}
+      * {{ box-sizing: border-box; }}
+      html, body {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }}
+      #stage {{ position: relative; width: 100%; height: 100%; overflow: hidden; }}
+      .video-wrapper {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; }}
+      .video-wrapper video {{ width: 100%; height: 100%; object-fit: cover; }}
+      .head-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
+      .kicker {{ position: absolute; left: 60px; right: 60px; top: 232px; height: 64px; display: flex;
+                align-items: center; justify-content: center; color: var(--accent-0);
+                font-family: "{hfam}", sans-serif; font-size: 44px; letter-spacing: 0.14em; }}
+      .rule {{ position: absolute; left: 0; top: 414px; width: 1080px; height: 6px; background: var(--accent-0); transform-origin: 0 50%; }}
+      .card-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; overflow: hidden; }}
+      .card-host .card {{ position: relative; width: 100%; height: 100%; }}
+      .card .slot {{ position: absolute; left: 60px; right: 60px; top: 298px; height: 116px; overflow: hidden; }}
+      .card .line {{ position: absolute; left: 0; right: 0; top: 0; height: 116px; display: block; text-align: center;
+                    white-space: pre; font-family: "{hfam}", sans-serif; font-weight: {hw}; font-size: 104px;
+                    line-height: 122px; letter-spacing: 0.03em; color: var(--text); text-transform: uppercase; }}
+      .card .accent {{ color: var(--accent-0); }}
+      .card .stat {{ position: absolute; left: 0; top: 420px; width: 1080px; height: 1500px; background: rgba(10,10,10,0.94);
+                    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+                    padding-bottom: 420px; }}  /* keep the stat above the low captions (K2) */
+      .card .stat .big {{ font-family: "{hfam}", sans-serif; font-size: 420px; line-height: 0.9; color: var(--accent-0); letter-spacing: 0.01em; }}
+      .card .stat .sub {{ font-family: "{hfam}", sans-serif; font-size: 96px; letter-spacing: 0.08em; color: var(--text); text-transform: uppercase; }}
+      .card .stat .sub .accent {{ color: var(--accent-0); }}
+      .card .tag {{ position: absolute; left: 60px; top: 448px; padding: 16px 30px 18px; background: rgba(10,10,10,0.88);
+                   border-left: 6px solid var(--accent-0); border-radius: 6px; }}
+      .card .tag .name {{ font-family: "{hfam}", sans-serif; font-size: 58px; letter-spacing: 0.06em; color: var(--text); line-height: 1; }}
+      .card .tag .org {{ font-family: "{cfam}", sans-serif; font-weight: 600; font-size: 40px; color: var(--accent-0); margin-top: 6px; }}
+      .caps-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
+      .caps-host .cap {{ position: absolute; left: 70px; right: 70px; text-align: center; white-space: nowrap;
+                        font-family: "{cfam}", sans-serif; font-weight: {cw}; font-size: 76px; line-height: 1.08;
+                        letter-spacing: -0.01em; color: #ffffff; -webkit-text-stroke: 12px #0a0a0a; paint-order: stroke fill;
+                        text-shadow: 0 6px 18px rgba(0,0,0,0.5); opacity: 0; }}
+      .caps-host .cap .em {{ color: var(--accent-0); }}
+    </style>
+  </head>
+  <body>
+    <div id="stage" data-composition-id="talking-head-recut" data-start="0" data-duration="{dur}" data-fps="30" data-width="1080" data-height="1920">
+      <div class="video-wrapper"><video id="bg-video" src="input-video.mp4" playsinline data-has-audio="true" data-start="0" data-duration="{dur}" data-track-index="1"></video></div>
+      <div class="head-host clip" data-start="0" data-duration="{dur}" data-track-index="2">
+        <div class="kicker" id="kicker">{kicker}</div>
+        <div class="rule" id="rule"></div>
+      </div>
+{hosts}
+      <div id="caps-host" class="caps-host clip" data-start="0" data-duration="{dur}" data-track-index="4"></div>
+      <script src="vendor/gsap.min.js"></script>
+      <script src="timings.js"></script>
+      <script>
+        (function () {{
+          const q = (t) => Math.round(t * 30) / 30;
+          const tl = window.gsap.timeline({{ paused: true }});
+          const T = window.__T, KINDS = {kinds};
+          const host = (id) => '.card-host[data-card-id="' + id + '"]';
+          const el = (id, part) => '.card[data-card-id="' + id + '"] #' + id + "-" + part;
+          tl.fromTo("#kicker", {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.24, ease: "power3.out" }}, 0);
+          tl.fromTo("#rule", {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.5, ease: "power3.out" }}, 0);
+          Object.keys(KINDS).forEach(function (id) {{
+            const s = T[id].start, e = T[id].end, k = KINDS[id];
+            tl.set(host(id), {{ visibility: "visible", opacity: 1 }}, q(s));
+            tl.set(host(id), {{ opacity: 0, visibility: "hidden" }}, q(e));
+            if (k === "line") {{   // rises out of the accent rule, sinks out (STYLE L3)
+              tl.fromTo(el(id, "line"), {{ yPercent: 100, opacity: 0 }}, {{ yPercent: 0, opacity: 1, duration: 0.24, ease: "power3.out" }}, q(s));
+              tl.to(el(id, "line"), {{ yPercent: -60, opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
+            }} else if (k === "stat") {{
+              tl.fromTo(el(id, "stat"), {{ opacity: 0 }}, {{ opacity: 1, duration: 0.14, ease: "power2.out" }}, q(s));
+              tl.fromTo(el(id, "big"), {{ scale: 0.86, opacity: 0 }}, {{ scale: 1, opacity: 1, duration: 0.3, ease: "power3.out" }}, q(s + 0.04));
+              tl.fromTo(el(id, "sub"), {{ y: 30, opacity: 0 }}, {{ y: 0, opacity: 1, duration: 0.24, ease: "power3.out" }}, q(s + 0.22));
+              tl.to(el(id, "stat"), {{ opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
+            }} else {{
+              tl.fromTo(el(id, "tag"), {{ x: -40, opacity: 0 }}, {{ x: 0, opacity: 1, duration: 0.26, ease: "power3.out" }}, q(s));
+              tl.to(el(id, "tag"), {{ x: -20, opacity: 0, duration: 0.18, ease: "power2.in" }}, q(e - 0.18));
+            }}
+          }});
+          tl.to("#rule", {{ scaleY: 2.2, duration: 0.16, yoyo: true, repeat: 1, ease: "power2.out" }}, q({end_beat}));
+          window.__timelines = window.__timelines || {{}};
+          window.__timelines["talking-head-recut"] = tl;
+        }})();
+      </script>
+      <script src="captions.js"></script>
+      <script>
+        (function () {{   // K1/K2 captions: one line, shrink to fit (min 62px), low on the chest
+          const tl = window.__timelines && window.__timelines["talking-head-recut"];
+          const caps = window.__CAPS;
+          if (!tl || !caps) return;
+          const host = document.getElementById("caps-host");
+          const y = window.__CAPS_Y || {caps_y};
+          const q = (t) => Math.round(t * 30) / 30;
+          const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          caps.forEach(function (c, i) {{
+            const d = document.createElement("div");
+            d.className = "cap"; d.id = "cap-" + i; d.style.top = y + "px";
+            d.innerHTML = c.words.map(function (w) {{ return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t); }}).join(" ");
+            host.appendChild(d);
+            const room = 940, base = parseFloat(getComputedStyle(d).fontSize);
+            if (d.scrollWidth > room) d.style.fontSize = Math.max(62, Math.floor(base * room / d.scrollWidth)) + "px";
+            tl.set(d, {{ yPercent: -50, opacity: 0 }}, 0);
+            tl.set(d, {{ opacity: 1 }}, q(c.in));
+            tl.fromTo(d, {{ scale: 0.94 }}, {{ scale: 1, duration: 0.1, ease: "power2.out" }}, q(c.in));
+            tl.set(d, {{ opacity: 0 }}, q(c.out));
+          }});
+        }})();
+      </script>
+    </div>
+  </body>
+</html>
+"""
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+    main()
