@@ -19,7 +19,8 @@ overlays.json additions (alongside the usual canvas/face_box/cards/captions):
     "kicker": {"image": "/abs/logo.png", "width": 430}      # or {"text": "WIMBLEDON FAQ"}
   },
   "cards": [
-    {"id": "c1", "start": 0.1, "end": 2.4, "text": "Never lose *money*"},          # kind "line" (default)
+    {"id": "t0", "kind": "title", "text": "Our job: never lose *money*"},   # K2: one static title, whole clip
+    {"id": "c1", "start": 0.1, "end": 2.4, "text": "Never lose *money*"},          # kind "line": swapping headlines (pre-K2)
     {"id": "s1", "kind": "stat", "start": 9.0, "end": 11.4, "text": "3–5×", "sub": "In 4–6 years"},
     {"id": "n1", "kind": "tag", "start": 20.0, "end": 21.6, "text": "Aaron Darr", "sub": "Lead Edge Capital"},
                                         # tag = name line in the band slot (one band line at a time)
@@ -36,6 +37,7 @@ import html, json, os, re, shutil, subprocess, sys
 
 REGION = [0, 420, 1080, 1500]   # speaker region under the band
 LINE_BOX = [60, 300, 960, 116]
+TAG_BOX = [48, 440, 600, 72]   # one-line name label over the video, clear of the head
 
 
 def fps_of(path):
@@ -175,39 +177,41 @@ def main():
     # fill boxes for check_plan
     for c in ov["cards"]:
         kind = c.get("kind", "line")
-        if kind == "line":
+        if kind in ("line", "title"):
             c.setdefault("bbox", LINE_BOX)
             c.setdefault("font_px", 104)
+            if kind == "title":
+                c.update(persistent=True, start=0, end=dur)
         elif kind == "stat":
             c.setdefault("bbox", REGION)
             c.setdefault("font_px", 64)
         elif kind == "tag":
-            c["bbox"] = LINE_BOX
-            c.setdefault("font_px", 84)
+            c["bbox"] = TAG_BOX
+            c["font_px"] = 40
     json.dump(ov, open(ovp, "w"), indent=1, ensure_ascii=False)
 
     hosts = []
     for c in ov["cards"]:
         kind, cid = c.get("kind", "line"), c["id"]
-        if c.get("persistent"):
+        if c.get("persistent") and kind != "title":
             continue
         attrs = (f'class="card-host clip" data-card-id="{cid}" data-start="{c["start"]}" '
                  f'data-duration="{round(c["end"] - c["start"], 3)}" data-track-index="3" '
                  'style="visibility:hidden;opacity:0;"')
-        if kind == "line":
+        if kind in ("line", "title"):
             fs = f' style="font-size:{int(c["font_px"])}px"' if c.get("font_px", 104) != 104 else ""
             inner = f'<div class="slot"><div class="line" id="{cid}-line"{fs}>{rich(c["text"])}</div></div>'
         elif kind == "stat":
             kk = f'<div class="kick">{rich(c["kicker"])}</div>' if c.get("kicker") else ""
             inner = (f'<div class="stat" id="{cid}-stat">{kk}<div class="big" id="{cid}-big">{rich(c["text"])}</div>'
                      f'<div class="sub" id="{cid}-sub">{rich(c.get("sub", ""))}</div></div>')
-        else:  # name tag: lives in the band slot like a headline
-            fs = int(c.get("font_px", 84))
-            inner = (f'<div class="slot"><div class="line" id="{cid}-line" style="font-size:{fs}px">'
-                     f'{rich(c["text"])}<span class="accent"> · {html.escape(c.get("sub", ""))}</span></div></div>')
+        else:  # name tag: one compact label over the video (K2: the band holds only the title)
+            inner = (f'<div class="tag" id="{cid}-tag"><span class="name">{rich(c["text"])}</span>'
+                     f'<span class="org">{html.escape(c.get("sub", ""))}</span></div>')
         hosts.append(f'      <div {attrs}>\n        <div class="card" data-card-id="{cid}" data-kind="{kind}">{inner}</div>\n      </div>')
 
-    kinds = {c["id"]: c.get("kind", "line") for c in ov["cards"] if not c.get("persistent")}
+    kinds = {c["id"]: c.get("kind", "line") for c in ov["cards"]
+             if not c.get("persistent") or c.get("kind") == "title"}
     caps_y = int(ov.get("captions", {}).get("y", 1410))
     page = TEMPLATE.format(
         dur=dur, fps=fps, band=br["band"], text=br["text"], accent=br["accent"],
@@ -252,10 +256,10 @@ TEMPLATE = """<!doctype html>
       .card .stat .sub {{ font-family: "{hfam}", sans-serif; font-size: 96px; letter-spacing: 0.08em; color: var(--text); text-transform: uppercase; }}
       .card .stat .kick {{ font-family: "{hfam}", sans-serif; font-size: 72px; letter-spacing: 0.16em; color: var(--text); opacity: 0.8; }}
       .card .stat .sub .accent {{ color: var(--accent-0); }}
-      .card .tag {{ position: absolute; left: 60px; top: 448px; padding: 16px 30px 18px; background: rgba(10,10,10,0.88);
-                   border-left: 6px solid var(--accent-0); border-radius: 6px; }}
-      .card .tag .name {{ font-family: "{hfam}", sans-serif; font-size: 58px; letter-spacing: 0.06em; color: var(--text); line-height: 1; }}
-      .card .tag .org {{ font-family: "{cfam}", sans-serif; font-weight: 600; font-size: 40px; color: var(--accent-0); margin-top: 6px; }}
+      .card .tag {{ position: absolute; left: 48px; top: 440px; height: 72px; padding: 0 26px; display: flex; align-items: center;
+                   gap: 16px; background: rgba(10,10,10,0.86); border-left: 6px solid var(--accent-0); border-radius: 6px; white-space: nowrap; }}
+      .card .tag .name {{ font-family: "{hfam}", sans-serif; font-size: 48px; letter-spacing: 0.06em; color: var(--text); line-height: 1; }}
+      .card .tag .org {{ font-family: "{cfam}", sans-serif; font-weight: 600; font-size: 40px; color: var(--accent-0); }}
       .caps-host {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; pointer-events: none; }}
       .caps-host .cap {{ position: absolute; left: 110px; right: 110px; text-align: center; white-space: nowrap;
                         font-family: "{cfam}", sans-serif; font-weight: {cw}; font-size: 76px; line-height: 1.08;
@@ -282,13 +286,15 @@ TEMPLATE = """<!doctype html>
           const T = window.__T, KINDS = {kinds};
           const host = (id) => '.card-host[data-card-id="' + id + '"]';
           const el = (id, part) => '.card[data-card-id="' + id + '"] #' + id + "-" + part;
-          tl.fromTo("#kicker", {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.24, ease: "power3.out" }}, 0);
-          tl.fromTo("#rule", {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.5, ease: "power3.out" }}, 0);
+          tl.set("#kicker", {{ opacity: 1 }}, 0);   // whole band on frame 0 (first frame = thumbnail)
+          tl.set("#rule", {{ scaleX: 1 }}, 0);
           Object.keys(KINDS).forEach(function (id) {{
             const s = T[id].start, e = T[id].end, k = KINDS[id];
             tl.set(host(id), {{ visibility: "visible", opacity: 1 }}, q(s));
             tl.set(host(id), {{ opacity: 0, visibility: "hidden" }}, q(e));
-            if (k === "line" || k === "tag") {{   // rises out of the accent rule, sinks out (STYLE L3)
+            if (k === "title") {{   // K2: one static title, rises with the rule, holds to the end
+              tl.set(el(id, "line"), {{ yPercent: 0, opacity: 1 }}, 0);   // on frame 0 (first frame = thumbnail)
+            }} else if (k === "line") {{   // rises out of the accent rule, sinks out (STYLE L3)
               tl.fromTo(el(id, "line"), {{ yPercent: 100, opacity: 0 }}, {{ yPercent: 0, opacity: 1, duration: 0.24, ease: "power3.out" }}, q(s));
               if (e < {dur} - 0.05) tl.to(el(id, "line"), {{ yPercent: -60, opacity: 0, duration: 0.16, ease: "power2.in" }}, q(e - 0.16));
             }} else if (k === "stat") {{
