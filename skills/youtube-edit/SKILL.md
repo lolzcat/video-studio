@@ -293,6 +293,8 @@ Aaron Darr). Workdir `~/Movies/youtube-edit/<date>-<show>-<guest>/`, one sub-fol
    x 960): crop the speaker's half 0.72:1 (e.g. `crop=648:900:<x>:180` for a seated guest) under a
    420px brand band (header-band layout above). One `source_916.mp4` per clip window
    (`-ss <a> -to <b>`, a few seconds of margin), then `transcribe.py` on it so times are local.
+   Webcam/call footage: set `"smooth_motion": true` in each clip's `edl.json` (calls record
+   below the file's frame rate; ~1 in 4 frames repeat). With `"speed"`, use `max_pause` ≈ 0.45.
 5. **Paper edit per clip:** open on the strongest line (H1) and keep their words and meaning —
    reorder only when the meaning holds, drop hedges never (A1). ASR invents "um/but/and" at
    joins: confirm every join on the cut with Whisper

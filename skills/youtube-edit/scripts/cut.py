@@ -24,6 +24,12 @@ Top level (all optional):
   max_pause    shorten every pause inside kept segments to this many seconds and
                trim edge silence; writes edl_tight.json
   punch        punch-in used when alternating framing on jump cuts (default 1.15, Z1)
+  soft_cuts    (default true) a cut that keeps the same framing gets a 3-frame dissolve — a simple
+               "morph cut" — so the head doesn't jolt in place; framing changes stay hard cuts
+  smooth_motion  true: webcam/call footage often repeats ~1 in 4 frames (recorded below the file's
+               rate), so motion goes move-move-move-hold — sped up, it reads as shake. Drops the
+               repeats (mpdecimate) and rebuilds the in-betweens (motion-compensated minterpolate,
+               scene-change aware so it never blends across a hard cut). ~3 s of render per second.
   speed        e.g. 1.25: speed the whole cut up with the voice pitch kept (Premiere's
                "Maintain Audio Pitch") — Rubber Band R3 if installed (brew install rubberband),
                else ffmpeg atempo. Re-transcribe the cut afterwards as usual (timing truth).
@@ -92,6 +98,18 @@ def speed_up(path, speed, fps):
     subprocess.run(args, check=True)
     shutil.rmtree(tmp, ignore_errors=True)
     return engine
+
+
+def smooth_motion(path, fps):
+    import shutil, tempfile
+    tmp = tempfile.mkdtemp(prefix="smooth_", dir=os.path.dirname(os.path.abspath(path)))
+    src = os.path.join(tmp, "in.mp4")
+    shutil.move(path, src)
+    vf = ("mpdecimate=hi=1280:lo=512:frac=0.5,"
+          f"minterpolate=fps={fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1:scd=fdiff")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", vf, "-c:v", "libx264", "-preset", "medium",
+                    "-crf", "18", "-c:a", "copy", path], check=True)
+    shutil.rmtree(tmp, ignore_errors=True)
 
 
 def rms_db(src, a, b):
@@ -205,12 +223,38 @@ def main():
             parts.append(v + f",split=2[b{i}][r{i}]")
             parts.append(f"[r{i}]crop={cw}:{ch}:{cx}:{cy},scale={rw}:{rh}:flags=lanczos,setsar=1[z{i}]")
             v = f"[b{i}][z{i}]overlay={rx}:{ry}"
-        parts.append(v + f",fps={fps},format=yuv420p[v{i}]")
+        parts.append(v + f",fps={fps},format=yuv420p,settb=1/{fps}[v{i}]")   # one timebase for xfade
         d = b - a
         parts.append(f"[{k}:a]atrim={a}:{b},asetpts=PTS-STARTPTS,aresample=48000,"
                      f"volume={gains[i]:.2f}dB,afade=t=in:d={FADE},afade=t=out:st={max(0, d - FADE)}:d={FADE}[a{i}]")
         labels.append(f"[v{i}][a{i}]")
-    parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a=1[v][a]")
+    # Join: hard cut where framing changes or the take simply continues; a short dissolve where a
+    # cut keeps the framing (otherwise the head jumps in place — reads as camera shake).
+    soft = edl.get("soft_cuts", True)
+    D = round(3 / fps, 4)
+    joins, rv, ra, length = [], "[v0]", "[a0]", segs[0]["out"] - segs[0]["in"]
+    for i in range(1, len(segs)):
+        p_, s_ = segs[i - 1], segs[i]
+        d = s_["out"] - s_["in"]
+        same_frame = abs(float(p_.get("zoom", 1)) - float(s_.get("zoom", 1))) < 0.01
+        continuous = p_["src"] == s_["src"] and abs(s_["in"] - p_["out"]) < 0.02
+        if soft and same_frame and not continuous and d > 2 * D and length > 2 * D:
+            parts.append(f"{rv}[v{i}]xfade=transition=fade:duration={D}:offset={length - D:.4f}[jv{i}]")
+            parts.append(f"{ra}[a{i}]acrossfade=d={D}:c1=tri:c2=tri[ja{i}]")
+            length += d - D
+            joins.append("soft")
+        else:
+            parts.append(f"{rv}{ra}[v{i}][a{i}]concat=n=2:v=1:a=1[cv{i}][ja{i}]")
+            parts.append(f"[cv{i}]settb=1/{fps}[jv{i}]")
+            length += d
+            joins.append("hard")
+        rv, ra = f"[jv{i}]", f"[ja{i}]"
+        s_["join"] = joins[-1]
+    parts.append(f"{rv}null[v]" if len(segs) > 1 else "[v0]null[v]")
+    parts.append(f"{ra}anull[a]" if len(segs) > 1 else "[a0]anull[a]")
+    json.dump({"segments": segs}, open(os.path.join(workdir, "edl_tight.json"), "w"), indent=1)  # with joins
+    if joins.count("soft"):
+        print(f"{joins.count('soft')} in-place cut(s) softened with a {D:.3f}s dissolve, {joins.count('hard')} hard")
     graph = os.path.join(workdir, "cut.filtergraph")
     open(graph, "w").write(";\n".join(parts))
     inputs = [x for src in sources for x in ("-i", src)]
@@ -223,6 +267,9 @@ def main():
         out_fps = fps * speed   # every source frame kept (24 x 1.25 = 30); resampling to 24 drops 1 in 5 = stutter
         out_fps = min((24, 25, 30, 48, 50, 60), key=lambda r: abs(r - out_fps)) if abs(out_fps - round(out_fps)) > 0.01 else round(out_fps)
         print(f"speed {speed}x with pitch kept ({speed_up(out, speed, out_fps)}), {out_fps} fps")
+    if edl.get("smooth_motion"):
+        smooth_motion(out, probe(out)[2])
+        print("motion smoothed (repeated frames rebuilt)")
 
     mapped, offset, cache = [], 0.0, {}
     for idx, s in enumerate(segs):
@@ -235,6 +282,8 @@ def main():
                 mapped.append({**wd, "start": round(a - s["in"] + offset, 3),
                                "end": round(b - s["in"] + offset, 3), "seg": idx})
         offset += s["out"] - s["in"]
+        if idx + 1 < len(segs) and segs[idx + 1].get("join") == "soft":
+            offset -= D
     if abs(speed - 1.0) > 0.001:  # approximate until the re-ASR of the cut replaces it
         mapped = [{**wd, "start": round(wd["start"] / speed, 3), "end": round(wd["end"] / speed, 3)} for wd in mapped]
         offset /= speed
