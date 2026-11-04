@@ -10,7 +10,9 @@ Reads <workdir>/words_cut.json (ASR of the cut) and the optional "captions" bloc
     "fixes": {"revers": "roofers", "Reune": "Reoon"},   # ASR spelling fixes (case-insensitive)
     "emphasis": ["Lumrid", "free"],  # words shown in the accent colour (numbers always are)
     "max_words": 4,
-    "glue": ["US", "ripped"]         # never end a caption on these here ("US / Open")
+    "glue": ["US", "ripped"],        # never end a caption on these here ("US / Open")
+    "max_merge": 4,                  # short groups merge up to this many words (default max_words+3)
+    "max_chars": 22                  # one line only: break/merge by characters (76px Inter ≈ 22)
   }
 Writes:
   <workdir>/public/captions.js   window.__CAPS = [{in, out, words: [{t, em}]}]   (composition reads it)
@@ -60,6 +62,18 @@ def main():
     max_w, max_s, gap = arg("--max-words", int(cfg.get("max_words", 4))), arg("--max-s", 2.2), arg("--gap", 0.45)
     # "glue": words that must stay with the next one for this video ("US" Open, "ripped" jeans)
     weak = WEAK | {g.lower() for g in cfg.get("glue", [])}
+    # a too-short group merges into a neighbour up to this many words (default allows a 2-line
+    # caption; set it to max_words to keep every caption on one line)
+    max_merge = int(cfg.get("max_merge", max_w + 3))
+    # "max_chars": keep every caption on one line — break a group before it would pass this many
+    # characters, and never merge past it (~22 for 76px Inter across 940px)
+    max_chars = cfg.get("max_chars")
+
+    def chars(g):
+        return len(" ".join(tidy(x["text"], fixes) for x in g))
+
+    def fits(g):
+        return max_chars is None or chars(g) <= int(max_chars)
 
     words = [w for w in words if re.sub(r"\W", "", w["text"]).lower() not in FILLER]
     groups, cur = [], []
@@ -69,7 +83,8 @@ def main():
         pause = (nxt["start"] - w["end"]) if nxt else 99
         end_sent = w["text"][-1:] in ".?!"
         comma_pause = w["text"].endswith(",") and pause >= 0.25
-        long = len(cur) >= max_w or (w["end"] - cur[0]["start"]) >= max_s
+        long = len(cur) >= max_w or (w["end"] - cur[0]["start"]) >= max_s \
+            or (nxt is not None and not fits(cur + [nxt]))
         if not nxt or pause >= gap or end_sent or comma_pause:
             groups.append(cur)
             cur = []
@@ -93,10 +108,10 @@ def main():
                 continue
             nxt = merged[i + 1] if i + 1 < len(merged) else None
             prv = merged[i - 1] if i > 0 else None
-            if nxt and len(g) + len(nxt) <= max_w + 3 and nxt[0]["start"] - g[-1]["end"] < gap \
+            if nxt and len(g) + len(nxt) <= max_merge and fits(g + nxt) and nxt[0]["start"] - g[-1]["end"] < gap \
                     and g[-1]["text"][-1:] not in ".?!":
                 merged[i:i + 2] = [g + nxt]
-            elif prv and len(prv) + len(g) <= max_w + 2 and g[0]["start"] - prv[-1]["end"] < gap:
+            elif prv and len(prv) + len(g) <= max_merge - 1 and fits(prv + g) and g[0]["start"] - prv[-1]["end"] < gap:
                 merged[i - 1:i + 1] = [prv + g]
             else:
                 continue
@@ -116,7 +131,7 @@ def main():
         # A cut that starts mid-sentence ("[Regarding the] dress code…") still opens a sentence on screen.
         if ws and (not caps or re.search(r"[.?!]$", caps[-1]["words"][-1]["t"])):
             ws[0]["t"] = ws[0]["t"][:1].upper() + ws[0]["t"][1:]
-        caps.append({"in": round(t_in, 3), "out": round(max(t_out, t_in + 0.3), 3), "words": ws})
+        caps.append({"in": round(t_in, 3), "out": round(min(max(t_out, t_in + 0.3), nxt_in - 0.02), 3), "words": ws})
 
     cut = os.path.join(workdir, "cut.mp4")  # no cue may outlast the video (last one gets +0.5s)
     if os.path.exists(cut) and caps:

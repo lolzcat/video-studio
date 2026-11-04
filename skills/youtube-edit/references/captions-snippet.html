@@ -46,6 +46,10 @@
         return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t);
       }).join(" ");
       host.appendChild(el);
+      // one line only: shrink a long group to fit the band (never below 62px) instead of wrapping
+      el.style.whiteSpace = "nowrap";
+      const room = host.clientWidth - 140, base = parseFloat(getComputedStyle(el).fontSize);
+      if (el.scrollWidth > room) el.style.fontSize = Math.max(62, Math.floor(base * room / el.scrollWidth)) + "px";
       tl.set(el, { yPercent: -50, opacity: 0 }, 0);
       tl.set(el, { opacity: 1 }, q(c.in));
       tl.fromTo(el, { scale: 0.94 }, { scale: 1, duration: 0.1, ease: "power2.out" }, q(c.in));
