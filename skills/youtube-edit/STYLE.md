@@ -19,7 +19,7 @@ apply them, and confirm/adjust them with Andrew.
 - **C5** Hook (first ~30s) is the tightest part of the video — every line must earn its place.
 
 ## Zooms
-- **Z1** On jump cuts, alternate framing 1.0 ↔ 1.12–1.18 punch-in so cuts look intentional.
+- **Z1** On real edits (a line moved, a word dropped), alternate framing 1.0 ↔ 1.12–1.18 punch-in so cuts look intentional — but framing changes **at most every 2.5s**: removed pauses and pieces under 0.6s keep the current framing (Andrew, 2026-11-04: "whats with the camera micro shakes" — a flip every 1.5–2s read as the camera twitching). Speed changes keep every frame (24 fps × 1.25 → 30 fps); dropping frames to stay at 24 stutters.
 - **Z2** Bigger punch-in (1.3) for emphasis lines and when Andrew says "zoom".
 - **Z3** Punch-in focus on the face (eyes in upper third), never crop the top of the head.
 

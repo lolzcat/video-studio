@@ -13,7 +13,8 @@ Reads <workdir>/words_cut.json (ASR of the cut) and the optional "captions" bloc
     "glue": ["US", "ripped"],        # never end a caption on these here ("US / Open")
     "max_merge": 4,                  # short groups merge up to this many words (default max_words+3)
     "max_chars": 22,                 # one line only: break/merge by characters (76px Inter ≈ 22)
-    "plain": true                    # K2: no accent words when a headline card owns the accent
+    "plain": true,                   # no accent words at all
+    "phrase_fixes": {"times our money": "tons of money"}   # verified wording for a run of ASR words
   }
 Writes:
   <workdir>/public/captions.js   window.__CAPS = [{in, out, words: [{t, em}]}]   (composition reads it)
@@ -45,6 +46,26 @@ def tidy(word, fixes):
     if m:  # 1100 -> 1,100
         word = f"{m[1]}{int(m[2]):,}{m[3]}"
     return word
+
+
+def phrase_fix(words, fixes):
+    """"phrase_fixes": {"times our money": "tons of money"} — replace a run of ASR words with the
+    verified wording (spread over the same time span). Survives every re-cut, unlike hand edits."""
+    norm = lambda t: re.sub(r"[^\w']", "", t).lower()
+    for bad, good in fixes.items():
+        pat, rep_words = [norm(x) for x in bad.split()], good.split()
+        i = 0
+        while i + len(pat) <= len(words):
+            if [norm(w["text"]) for w in words[i:i + len(pat)]] == pat:
+                a, b = words[i]["start"], words[i + len(pat) - 1]["end"]
+                step = (b - a) / len(rep_words)
+                new = [{**words[i], "text": t, "start": round(a + k * step, 3), "end": round(a + (k + 1) * step, 3)}
+                       for k, t in enumerate(rep_words)]
+                words[i:i + len(pat)] = new
+                i += len(new)
+            else:
+                i += 1
+    return words
 
 
 def srt_time(t):
@@ -79,6 +100,7 @@ def main():
         return max_chars is None or chars(g) <= int(max_chars)
 
     words = [w for w in words if re.sub(r"\W", "", w["text"]).lower() not in FILLER]
+    words = phrase_fix(words, cfg.get("phrase_fixes", {}))
     groups, cur = [], []
     for i, w in enumerate(words):
         cur.append(w)

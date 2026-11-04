@@ -140,24 +140,35 @@ def tighten(segs, max_pause):
         for j, (pa, pb) in enumerate(pieces):
             if pb - pa < 0.15:
                 continue
-            out.append({**s, "in": round(pa, 3), "out": round(pb, 3), "zoom_lock": s.get("zoom_lock", False) and j == 0})
+            out.append({**s, "in": round(pa, 3), "out": round(pb, 3), "zoom_lock": s.get("zoom_lock", False) and j == 0,
+                        "trim_piece": j > 0})   # j > 0: only a pause was removed, not a real edit
     return out
 
 
-def alternate_zooms(segs, punch):
-    """No two neighbouring segments may share a zoom (that cut is a jump in place)."""
-    prev = None
+MIN_ZOOM_HOLD = 2.5   # s between framing changes (Andrew 2026-11-04: "camera micro shakes")
+MIN_FLIP_PIECE = 0.6  # a sliver shorter than this never gets its own framing
+
+
+def alternate_zooms(segs, punch, speed=1.0):
+    """Alternate framing on real edits so jump cuts look intentional (Z1), but never more often
+    than every MIN_ZOOM_HOLD seconds: removed pauses and slivers keep the current framing."""
+    prev, held = None, 0.0   # the opening framing holds too
     for s in segs:
+        d = (s["out"] - s["in"]) / speed
         z = float(s.get("zoom", 1.0))
-        if s.get("zoom_match_prev") and prev is not None:
-            s["zoom"] = prev  # e.g. a held tail: same framing, no jump on the last frame
+        if prev is not None and (s.get("zoom_match_prev") or s.get("trim_piece") or d < MIN_FLIP_PIECE
+                                 or (held < MIN_ZOOM_HOLD and not s.get("zoom_lock"))):
+            s["zoom"] = prev  # same framing: a held tail, a trimmed pause, a sliver, or too soon
+            held += d
             continue
         if z > 1.0 and not s.get("zoom_lock"):
             z = punch  # one punch level keeps jump cuts consistent (Z1)
         if prev is not None and abs(z - prev) < 0.01 and not s.get("zoom_lock"):
             z = punch if prev <= 1.0 else 1.0
+        held = 0.0 if prev is not None and abs(z - prev) >= 0.01 else held
         s["zoom"] = z
         prev = z
+        held += d
     return segs
 
 
@@ -170,7 +181,7 @@ def main():
         s.setdefault("src", video)
     if edl.get("max_pause"):
         segs = tighten(segs, float(edl["max_pause"]))
-    segs = alternate_zooms(segs, float(edl.get("punch", 1.15)))
+    segs = alternate_zooms(segs, float(edl.get("punch", 1.15)), float(edl.get("speed", 1.0)))
     json.dump({"segments": segs}, open(os.path.join(workdir, "edl_tight.json"), "w"), indent=1)
     sources = []
     for s in segs:
@@ -209,7 +220,9 @@ def main():
                     "-c:a", "aac", "-b:a", "256k", "-ar", "48000", out], check=True)
     speed = float(edl.get("speed", 1.0))
     if abs(speed - 1.0) > 0.001:
-        print(f"speed {speed}x with pitch kept ({speed_up(out, speed, fps)})")
+        out_fps = fps * speed   # every source frame kept (24 x 1.25 = 30); resampling to 24 drops 1 in 5 = stutter
+        out_fps = min((24, 25, 30, 48, 50, 60), key=lambda r: abs(r - out_fps)) if abs(out_fps - round(out_fps)) > 0.01 else round(out_fps)
+        print(f"speed {speed}x with pitch kept ({speed_up(out, speed, out_fps)}), {out_fps} fps")
 
     mapped, offset, cache = [], 0.0, {}
     for idx, s in enumerate(segs):
