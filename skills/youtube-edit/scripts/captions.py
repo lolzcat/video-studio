@@ -122,7 +122,9 @@ def main():
     for k, g in enumerate(merged):
         t_in = max(0.0, g[0]["start"] - 0.06)
         nxt_in = merged[k + 1][0]["start"] - 0.06 if k + 1 < len(merged) else g[-1]["end"] + 0.5
-        t_out = min(nxt_in - 0.02, g[-1]["end"] + 0.35)
+        t_out = g[-1]["end"] + 0.35
+        if t_out >= nxt_in - 0.25:  # short gap: hold until the next group (a 1-frame blank reads as flicker)
+            t_out = nxt_in
         ws = []
         for w in g:
             t = tidy(w["text"], fixes)
@@ -131,7 +133,7 @@ def main():
         # A cut that starts mid-sentence ("[Regarding the] dress code…") still opens a sentence on screen.
         if ws and (not caps or re.search(r"[.?!]$", caps[-1]["words"][-1]["t"])):
             ws[0]["t"] = ws[0]["t"][:1].upper() + ws[0]["t"][1:]
-        caps.append({"in": round(t_in, 3), "out": round(min(max(t_out, t_in + 0.3), nxt_in - 0.02), 3), "words": ws})
+        caps.append({"in": round(t_in, 3), "out": round(min(max(t_out, t_in + 0.3), nxt_in), 3), "words": ws})
 
     cut = os.path.join(workdir, "cut.mp4")  # no cue may outlast the video (last one gets +0.5s)
     if os.path.exists(cut) and caps:
