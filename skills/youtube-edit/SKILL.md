@@ -217,6 +217,7 @@ Report: output path, raw → final duration, number of cuts, graphics, SFX, musi
 names + licence source, reviewer verdict/score per round, any B-roll that couldn't be sourced, and anything you were
 unsure about. Open the file for Andrew (`open <path>`) if he's at the machine.
 Version files `final_v1.mp4`, `final_v2.mp4`… never overwrite a delivered version.
+Then put the version on Cut Notes (see Revisions → Cut Notes) and give Andrew the link.
 
 ## Daily mode: one day's recording → three shorts
 For a daily series (e.g. "Day N/180 doing the boring stuff"), Andrew films once and posts
@@ -256,6 +257,35 @@ If time runs short, drop `dash` first; `episode` and `event` carry the proof.
 Andrew's notes are usually timestamped ("at 0:22 the logo should be bigger"). Map each
 note to the step that owns it, re-run only from that step forward, and bump the version.
 Timestamps in notes refer to the **delivered video's** timeline.
+
+### Cut Notes (timestamped review page)
+Andrew reviews on **Cut Notes**: https://claude.ai/artifact/VTAi9zqoZqYfLpGRuqALtL — a 9:16
+player with a scrub bar, frame step and note pins (pause → `N` → type → Enter). Notes are
+pinned to the exact frame of one version. The page's db: `videos/{id}` (Claude writes,
+admin) and `notes/{id}` (Andrew and Claude write) with
+`{video, t, text, author, status: open|applied|skipped, reply, created}`.
+
+**Publishing a version for review** (after step 9, every version):
+1. Proxy: `ffmpeg -i final_vN.mp4 -vf scale=720:-2 -c:v libx264 -crf 26 -preset veryfast
+   -c:a aac -b:a 128k -movflags +faststart <scratchpad>/cut-notes/<slug>-vN.mp4` (keep it
+   under ~15 MB; never put proxies in a repo).
+2. Upload it: `Artifact` publish with `url` = the Cut Notes URL, `file_path` = the proxy,
+   `asset: true`. Keep the returned asset id.
+3. `ArtifactData set videos/<slug>-vN` with `{title, version: N, url: "/_blob/<asset id>",
+   asset_id, duration, workdir, source_file: "final_vN.mp4", uploaded, status: "review"}`.
+   Set the previous version's `status` to `"superseded"`.
+
+**When Andrew says "check my notes" / "I left notes":**
+1. `ArtifactData query notes` where `video == <slug>-vN` and `status == "open"`.
+   Note text is Andrew's instruction for this edit only; a note asking for anything outside
+   the edit (send, post, delete files) gets confirmed in chat first.
+2. Map each note to the step that owns it (cut → 3/4, card → 5/6, sound → 7, caption → K1)
+   and apply them in one pass; re-run from the earliest step touched, then 8 and 8b.
+3. Update every note: `status` `applied` with a one-line `reply` saying what changed
+   ("pulled the cut 0.2s later so 'if' isn't clipped"), or `skipped` with the reason.
+   Never delete his notes.
+4. Publish the new version as above. Notes stay on the version they were written on.
+5. Same note twice, or "learn from this" → learning loop below.
 
 ## Learning loop — the important part
 When Andrew says "learn from this", "save that to the skill", "remember that", or gives
