@@ -76,6 +76,15 @@ fixes them, replies on each one and uploads the next version.
 
 Videos are uploaded as 720p proxies to the page itself; they never go in this repo.
 
+## B-roll
+
+`youtube-edit/references/broll-prompting.md` routes every line (stay on the speaker, real proof,
+existing footage, a graphic, or generated), writes generated-shot prompts in one fixed order with a
+"who filmed this" realism pass, and `scripts/broll.py` gates spending: review with prices →
+Andrew approves named shots → dry run → submit once → fetch → place. Ideas adapted from
+[minimax-h3-broll-generator](https://github.com/guangjun5952/minimax-h3-broll-generator) and
+[seedance-prompt](https://github.com/zhouwei713/seedance-prompt) (both MIT).
+
 ## Style profiles
 
 `styles/*.md` are style profiles built from creator studies (`/video-research` creator

@@ -135,6 +135,8 @@ word), `text`, `bbox` [x,y,w,h], `font_px` (the **smallest** text on the card), 
 `events` for inner beats (list rows, badges); plus `canvas` and `face_box` (the region
 graphics must never cover — read it off a frame). Respect the density in STYLE.md.
 
+**B-roll plan:** route each line per [references/broll-prompting.md](references/broll-prompting.md)
+(real proof first; generated only for metaphors, with Andrew's OK on the cost via `scripts/broll.py`).
 **B-roll research:** when Andrew references a real thing ("OpenAI just announced…",
 "this post on X", a paper, a tool), open the real source in the browser, screenshot it
 (full-page or element), and save to `<workdir>/broll/`. Only show real, verifiable
@@ -302,15 +304,16 @@ Aaron Darr). Workdir `~/Movies/youtube-edit/<date>-<show>-<guest>/`, one sub-fol
    laid over the speaker. Captions per K1/K2: `captions.y` ≈ 1410 (chest), `"plain": true`,
    `max_chars` 28. Then the usual `timing.py export` → `check_plan.py` → render → mix → QC →
    sync sheet → one independent review per clip (run the reviewers in parallel).
-7. **B-roll:** real footage/screens first (G6). For a metaphor with no real footage, generate it —
-   **ask Andrew first** with the shot list, model and cost (2026-11-04: "ask before"); read-only
-   lookups need no OK. Higgsfield (`mcp__higgsfield__*`, Plus plan) picks a model for you:
-   `models_explore` with `action: "recommend"`, `type: "video"` and a short query (long queries
-   return nothing) — top picks for text-only B-roll were Seedance 2.5, Kling 3.0 (`sound: "off"`
-   costs less), Cinema Studio 4.0. Or Oxen (photo/video only; see `~/.config/oxen/README.md`): read the model's `request_schema`
-   and price first, queue with `POST /queue`, never retry an uncertain POST. MiniMax H3 text-to-
-   video at 768P, `aspect_ratio` 3:4, 5s ≈ $0.44 per shot; prompt "cinematic, low-key, no
-   text/logos/faces". Use 1–2.5s of each. Say in the delivery which shots are generated.
+7. **B-roll** — follow [references/broll-prompting.md](references/broll-prompting.md):
+   route every line (`A_ROLL` / `REAL` / `EXISTING` / `GRAPHIC` / `GENERATED`; most lines stay on
+   the speaker), write `broll-plan.json`, and for generated shots use the one-idea prompt order
+   plus the realism pass ("who filmed this, on what, with which flaw"). Then
+   `broll.py review` → **show Andrew the table and total, wait for a yes naming the shots** →
+   `broll.py approve --shots … --confirm` → `queue` (dry run) → `queue --go` → `fetch` → look at
+   every shot → `place` → `band.py`. Models: Higgsfield `models_explore` `action: "recommend"`
+   (short query; picks were Seedance 2.5, Kling 3.0, Cinema Studio 4.0) or Oxen (MiniMax H3 768P
+   3:4 ≈ $0.44/5s; Seedance 2.5 720p ≈ $1.22/5s); quote both when the model is on both. Say in the
+   delivery which shots are generated.
 8. **Deliver:** each clip on Cut Notes (one `videos` doc per clip), plus the shortlist of
    unedited quotes with timestamps.
 
