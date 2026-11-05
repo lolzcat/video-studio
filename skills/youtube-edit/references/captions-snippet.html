@@ -21,39 +21,20 @@
     opacity: 0;
   }
   .caps-host .cap .em { color: var(--accent-0); }
+  /* "style": "bold" (captions block in overlays.json): heavy uppercase, each word pops in */
+  .caps-host .cap.bold { font-weight: 900; font-size: 100px; line-height: 1; text-transform: uppercase;
+                         letter-spacing: 0.01em; word-spacing: 0; -webkit-text-stroke: 14px #0b0b0f; }
+  .caps-host .cap.bold .w { display: inline-block; margin: 0 0.1em; transform-origin: 50% 70%; }
+  .caps-host .cap.bold .w.em { font-size: 1.1em; }
 </style>
 
 <!-- 2) host (inside #stage, after the card hosts) -->
 <div id="caps-host" class="caps-host clip" data-start="0" data-duration="DURATION" data-track-index="3"></div>
 
-<!-- 3) scripts (after the main timeline script) -->
+<!-- 3) scripts (after the main timeline script); set fps to the composition's data-fps -->
 <script src="captions.js"></script>
+<script>window.__CAPS_CFG = { fps: 30, room: 940, min: 62 };</script>
 <script>
-  (function () {
-    const tl = window.__timelines && window.__timelines["talking-head-recut"];
-    const caps = window.__CAPS;
-    if (!tl || !caps) return;
-    const host = document.getElementById("caps-host");
-    const y = window.__CAPS_Y || Math.round(1920 * 0.68);
-    const q = (t) => Math.round(t * 30) / 30;
-    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    caps.forEach(function (c, i) {
-      const el = document.createElement("div");
-      el.className = "cap";
-      el.id = "cap-" + i;
-      el.style.top = y + "px";
-      el.innerHTML = c.words.map(function (w) {
-        return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t);
-      }).join(" ");
-      host.appendChild(el);
-      // one line only: shrink a long group to fit the band (never below 62px) instead of wrapping
-      el.style.whiteSpace = "nowrap";
-      const room = host.clientWidth - 140, base = parseFloat(getComputedStyle(el).fontSize);
-      if (el.scrollWidth > room) el.style.fontSize = Math.max(62, Math.floor(base * room / el.scrollWidth)) + "px";
-      tl.set(el, { yPercent: -50, opacity: 0 }, 0);
-      tl.set(el, { opacity: 1 }, q(c.in));
-      tl.fromTo(el, { scale: 0.94 }, { scale: 1, duration: 0.1, ease: "power2.out" }, q(c.in));
-      tl.set(el, { opacity: 0 }, q(c.out));
-    });
-  })();
+  /* paste the contents of assets/vendor/caps-layer.js here: inline, not src= (the renderer
+     does not run an external script added this late; 9FE bold test, 2026-11-04) */
 </script>

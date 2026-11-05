@@ -14,8 +14,9 @@ Reads <workdir>/words_cut.json (ASR of the cut) and the optional "captions" bloc
     "max_merge": 4,                  # short groups merge up to this many words (default max_words+3)
     "max_chars": 22,                 # one line only: break/merge by characters (76px Inter ≈ 22)
     "plain": true,                   # no accent words at all
-    "phrase_fixes": {"times our money": "tons of money"}   # verified wording for a run of ASR words
-  }
+    "phrase_fixes": {"times our money": "tons of money"},  # verified wording for a run of ASR words
+    "style": "bold"                  # bold word captions: 1-3 heavy uppercase words, each pops in
+  }                                  # as spoken (defaults max_words 3, max_chars 16, gap 0.35)
 Writes:
   <workdir>/public/captions.js   window.__CAPS = [{in, out, words: [{t, em}]}]   (composition reads it)
   <workdir>/captions.srt         the same captions as a subtitle file for platform upload
@@ -81,15 +82,18 @@ def main():
     cfg = (json.load(open(ov_path)).get("captions", {}) if os.path.exists(ov_path) else {})
     fixes = {k.lower(): v for k, v in cfg.get("fixes", {}).items()}
     emph = {re.sub(r"[^\w$%']", "", e).lower() for e in cfg.get("emphasis", [])}
-    max_w, max_s, gap = arg("--max-words", int(cfg.get("max_words", 4))), arg("--max-s", 2.2), arg("--gap", 0.45)
+    style = cfg.get("style", "default")
+    bold = style == "bold"   # short punchy groups; caps-layer.js pops each word on its own start time
+    max_w = arg("--max-words", int(cfg.get("max_words", 3 if bold else 4)))
+    max_s, gap = arg("--max-s", 1.5 if bold else 2.2), arg("--gap", 0.35 if bold else 0.45)
     # "glue": words that must stay with the next one for this video ("US" Open, "ripped" jeans)
     weak = WEAK | {g.lower() for g in cfg.get("glue", [])}
     # a too-short group merges into a neighbour up to this many words (default allows a 2-line
     # caption; set it to max_words to keep every caption on one line)
-    max_merge = int(cfg.get("max_merge", max_w + 3))
+    max_merge = int(cfg.get("max_merge", max_w if bold else max_w + 3))
     # "max_chars": keep every caption on one line — break a group before it would pass this many
     # characters, and never merge past it (~22 for 76px Inter across 940px)
-    max_chars = cfg.get("max_chars")
+    max_chars = cfg.get("max_chars", 16 if bold else None)
     # "plain": no accent words at all (K2: a headline card owns the accent colour)
     plain = bool(cfg.get("plain", False))
 
@@ -143,6 +147,17 @@ def main():
             changed = True
             break
 
+    if bold:   # short groups strand small words ("of a" / "presentation"): lean them on the next group
+        isweak = lambda w: re.sub(r"[^\w']", "", tidy(w["text"], fixes)).lower() in weak
+        i = 0
+        while i + 1 < len(merged):
+            g, nx = merged[i], merged[i + 1]
+            if all(isweak(w) for w in g) and g[-1]["text"][-1:] not in ".?!" \
+                    and nx[0]["start"] - g[-1]["end"] < gap and chars(g + nx) <= (max_chars or 99) + 6:
+                merged[i:i + 2] = [g + nx]
+                continue
+            i += 1
+
     caps = []
     for k, g in enumerate(merged):
         t_in = max(0.0, g[0]["start"] - 0.06)
@@ -154,7 +169,7 @@ def main():
         for w in g:
             t = tidy(w["text"], fixes)
             bare = re.sub(r"[^\w$%']", "", t).lower()
-            ws.append({"t": t, "em": not plain and (bool(re.search(r"\d", t)) or bare in emph)})
+            ws.append({"t": t, "em": not plain and (bool(re.search(r"\d", t)) or bare in emph), "s": round(w["start"], 3)})
         # A cut that starts mid-sentence ("[Regarding the] dress code…") still opens a sentence on screen.
         if ws and (not caps or re.search(r"[.?!]$", caps[-1]["words"][-1]["t"])):
             ws[0]["t"] = ws[0]["t"][:1].upper() + ws[0]["t"][1:]
@@ -174,6 +189,7 @@ def main():
     with open(os.path.join(pub, "captions.js"), "w") as f:
         f.write("window.__CAPS = " + json.dumps(caps, ensure_ascii=False) + ";\n")
         f.write(f"window.__CAPS_Y = {int(cfg.get('y', 0)) or 'null'};\n")
+        f.write(f"window.__CAPS_STYLE = {json.dumps(style)};\n")
     with open(os.path.join(workdir, "captions.srt"), "w") as f:
         for n, c in enumerate(caps, 1):
             f.write(f"{n}\n{srt_time(c['in'])} --> {srt_time(c['out'])}\n{' '.join(w['t'] for w in c['words'])}\n\n")

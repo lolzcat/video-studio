@@ -219,6 +219,7 @@ def main():
         cfam=cf["family"], cfile=cfile, cw=cf.get("weight", 700),
         kicker=kicker_html, hosts="\n".join(hosts), kinds=json.dumps(kinds), caps_y=caps_y,
         end_beat=round(max(0.0, dur - 0.55), 3))
+    page = page.replace("__CAPS_LAYER__", open(os.path.join(os.path.dirname(gsap), "caps-layer.js")).read())
     open(os.path.join(pub, "index.html"), "w").write(page)
     picture(workdir, ov)
     print(f"band composition: {len(hosts)} cards, {len(ov.get('broll', []))} B-roll, {dur}s -> {pub}/index.html")
@@ -266,6 +267,10 @@ TEMPLATE = """<!doctype html>
                         letter-spacing: 0; word-spacing: 0.14em; color: #ffffff; -webkit-text-stroke: 15px #0a0a0a; paint-order: stroke fill;
                         text-shadow: 0 4px 10px rgba(0,0,0,0.75), 0 0 22px rgba(0,0,0,0.45); opacity: 0; }}
       .caps-host .cap .em {{ color: var(--accent-0); }}
+      .caps-host .cap.bold {{ font-weight: 900; font-size: 100px; line-height: 1; text-transform: uppercase;
+                             letter-spacing: 0.01em; word-spacing: 0; -webkit-text-stroke: 14px #0a0a0a; }}
+      .caps-host .cap.bold .w {{ display: inline-block; margin: 0 0.1em; transform-origin: 50% 70%; }}
+      .caps-host .cap.bold .w.em {{ font-size: 1.1em; }}   /* bigger in the layout, so it never overlaps */
     </style>
   </head>
   <body>
@@ -313,28 +318,9 @@ TEMPLATE = """<!doctype html>
         }})();
       </script>
       <script src="captions.js"></script>
-      <script>
-        (function () {{   // K1/K2 captions: one line, shrink to fit (min 62px), low on the chest
-          const tl = window.__timelines && window.__timelines["talking-head-recut"];
-          const caps = window.__CAPS;
-          if (!tl || !caps) return;
-          const host = document.getElementById("caps-host");
-          const y = window.__CAPS_Y || {caps_y};
-          const q = (t) => Math.round(t * {fps}) / {fps};
-          const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          caps.forEach(function (c, i) {{
-            const d = document.createElement("div");
-            d.className = "cap"; d.id = "cap-" + i; d.style.top = y + "px";
-            d.innerHTML = c.words.map(function (w) {{ return w.em ? '<span class="em">' + esc(w.t) + "</span>" : esc(w.t); }}).join(" ");
-            host.appendChild(d);
-            const room = 860, base = parseFloat(getComputedStyle(d).fontSize);
-            if (d.scrollWidth > room) d.style.fontSize = Math.max(62, Math.floor(base * room / d.scrollWidth)) + "px";
-            tl.set(d, {{ yPercent: -50, opacity: 0 }}, 0);
-            tl.set(d, {{ opacity: 1 }}, q(c.in));
-            tl.fromTo(d, {{ scale: 0.94 }}, {{ scale: 1, duration: 0.1, ease: "power2.out" }}, q(c.in));
-            tl.set(d, {{ opacity: 0 }}, q(c.out));
-          }});
-        }})();
+      <script>window.__CAPS_CFG = {{ fps: {fps}, y: {caps_y}, room: 860, min: 62 }};</script>
+      <script>  /* K1/K2 captions (assets/vendor/caps-layer.js, inlined: the renderer skips external scripts added late) */
+__CAPS_LAYER__
       </script>
     </div>
   </body>

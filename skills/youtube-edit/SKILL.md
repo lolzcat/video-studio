@@ -172,6 +172,8 @@ e.g. `["US", "ripped"]` so "US / Open" never splits) — then:
 ```bash
 python3 "$SKILL_DIR/scripts/captions.py" <workdir>
 ```
+For the punchy TikTok look add `"style": "bold"` (STYLE.md → Bold word captions): 1–3 heavy
+uppercase words, each popping in as it is spoken; it sets shorter groups by itself.
 It writes `public/captions.js` (+ `captions.srt` to upload as platform subtitles). Paste
 [references/captions-snippet.html](references/captions-snippet.html) into the composition
 (style, host div after the cards, scripts after the main timeline). Read the printed groups:
