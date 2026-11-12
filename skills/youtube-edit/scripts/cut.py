@@ -40,7 +40,8 @@ Top level (all optional):
 Every cut between two segments with the same zoom is a jump in place, so neighbours
 are forced to alternate 1.0 <-> punch (unless zoom_lock).
 
-All sources must share resolution. Also writes <workdir>/words_cut.json: the
+All sources must share an aspect ratio (cut.py stops otherwise); a different size or frame rate
+is converted to the first source's and reported. Also writes <workdir>/words_cut.json: the
 kept words remapped onto the cut timeline, which is what overlays, captions and
 SFX timing must use.
 """
@@ -63,6 +64,21 @@ def probe(video):
     if rot % 180 == 90:
         w, h = h, w
     return w, h, float(num) / float(den)
+
+
+def check_sources(sources, w, h, fps):
+    """Every segment is scaled to the first source's frame. A different SHAPE would be stretched,
+    so refuse it; a different size or frame rate is converted, but say so (it shows in the cut)."""
+    for src in sources[1:]:
+        sw, sh, sf = probe(src)
+        if abs(sw / sh - w / h) > 0.01:
+            sys.exit(f"cut.py: {os.path.basename(src)} is {sw}x{sh} but {os.path.basename(sources[0])} is {w}x{h} — "
+                     f"different shapes would be stretched. Crop/pad one to match first (e.g. build source_916.mp4).")
+        if (sw, sh) != (w, h):
+            print(f"note: {os.path.basename(src)} is {sw}x{sh}, scaled to {w}x{h}")
+        if abs(sf - fps) > 0.05:
+            print(f"WARNING: {os.path.basename(src)} is {sf:.2f} fps, converted to {fps:.2f} fps "
+                  f"(frames are dropped or repeated — look at its segments for stutter)")
 
 
 def silences(src, cache={}):
@@ -206,6 +222,7 @@ def main():
         if s["src"] not in sources:
             sources.append(s["src"])
     w, h, fps = probe(sources[0])
+    check_sources(sources, w, h, fps)
     rx, ry, rw, rh = edl.get("zoom_region", [0, 0, w, h])
     parts, labels = [], []
     gains = level_gains(segs) if edl.get("level_voice") else [0.0] * len(segs)

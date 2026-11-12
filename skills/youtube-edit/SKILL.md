@@ -221,10 +221,12 @@ python3 "$SKILL_DIR/scripts/mix.py" <workdir>/graphics.mp4 <workdir>/cut.mp4 \
 
 ### 8. QC (never skip)
 ```bash
-python3 "$SKILL_DIR/scripts/qc.py" <workdir>/final_vN.mp4 --expect-duration <cut seconds>
+python3 "$SKILL_DIR/scripts/qc.py" <workdir>/final_vN.mp4 --expect-duration <cut seconds> \
+  --expect-size 1080x1920 --expect-fps <cut fps>      # 1920x1080 for a full video
 uv run "$SKILL_DIR/scripts/sync_sheet.py" <workdir> <workdir>/final_vN.mp4
 ```
-`qc.py`: flashing (>3/s fails), black/frozen frames, dead air, loudness, A/V sync.
+`qc.py`: flashing (>3/s fails), black/frozen frames, dead air, A/V sync; and it **fails** on
+loudness outside -14 ±1 LUFS, true peak above -1 dB (S5), or the wrong duration, size or frame rate.
 `sync_sheet.py` is your ears: Read `sync_sheet.png` and the table. Every SFX must be
 `audible` (raise a BURIED/faint one 3 dB at a time up to -6 dB, or drop it) and heard
 within 40 ms of its visual. Fix every FAIL, then sample frames at each card and cut.
@@ -384,6 +386,12 @@ the same note twice:
 
 Never weaken a rule silently. Ask if a note is ambiguous about whether it's a one-off
 or a standing preference.
+
+## Changing the scripts
+Run the tests before committing any change under `scripts/` (stdlib only, ~2 s):
+`cd ~/projects/video-studio/tests && python3 -m unittest discover .` — they cover caption
+grouping (both styles), pause tightening, the zoom-hold rule, re-cut remapping and QC's checks.
+Add a test with every bug fix: the case that broke, as words in and groups/cuts out.
 
 ## Cost notes
 Parakeet, HyperFrames, ffmpeg: free/local. Claude usage is the main cost; keep long

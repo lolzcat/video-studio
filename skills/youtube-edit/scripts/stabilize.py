@@ -174,4 +174,9 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         sys.exit(__doc__)
-    main()
+    try:
+        main()
+    finally:   # the cut-out window is scratch: never leave it behind, even when a run fails
+        import os
+        if os.path.exists(sys.argv[2] + ".window.mp4"):
+            os.remove(sys.argv[2] + ".window.mp4")

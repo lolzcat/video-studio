@@ -15,7 +15,7 @@ Music is side-chain ducked under the voice when "duck" is true (default).
 Output is normalised to -14 LUFS integrated, -1.5 dBTP (YouTube target).
 Also writes pre-normalisation stems to <out dir>/stems/{rest,sfx}.wav for sync_sheet.py.
 """
-import json, os, re, subprocess, sys, tempfile
+import json, os, re, shutil, subprocess, sys, tempfile
 
 
 def main():
@@ -95,6 +95,7 @@ def main():
                     "-af", norm, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
                     "-shortest", out], check=True)
+    shutil.rmtree(os.path.dirname(mixdown), ignore_errors=True)
     print(f"mixed {len(music_labels)} music beds, {len(sfx_labels)} sfx -> {out}")
 
 

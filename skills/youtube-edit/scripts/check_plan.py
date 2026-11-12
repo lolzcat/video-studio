@@ -123,8 +123,10 @@ def main():
                          f"(keep it inside {UI_TOP}-{H - UI_BOTTOM})")
         if face and overlap(band, face) > 0.5 * band[2] * band[3]:
             warns.append("K1 caption band sits mostly over the face box — check it covers chin/chest/cap, not eyes or mouth")
-    elif fmt in ("short", "hook"):
-        warns.append("K1 no captions (public/captions.js) — shorts caption every line; run captions.py")
+    elif fmt == "short":
+        fails.append("K1 no captions (public/captions.js) — shorts caption every line; run captions.py")
+    elif fmt == "hook":
+        warns.append("K1 no captions (public/captions.js) — run captions.py if this hook ships as a short")
     if vertical:
         for c in cards:
             x, y, w, h = c.get("bbox", [0, 0, 0, 0])
